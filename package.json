@@ -3,9 +3,10 @@
   "main": "scraper.js",
   "dependencies": {
     "cheerio": "latest",
+    "pdf2json": "latest",
     "request": "latest",
     "sqlite3": "latest",
-    "pdf2json": "latest"
+    "url": "latest"
   },
   "keywords": [
     "scraper",

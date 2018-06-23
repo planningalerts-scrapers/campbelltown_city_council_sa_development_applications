@@ -5,6 +5,7 @@
     "cheerio": "latest",
     "request": "latest",
     "sqlite3": "latest"
+    "pdf2json": "latest"
   },
   "keywords": [
     "scraper",

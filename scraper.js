@@ -58,6 +58,7 @@ function run(db) {
                     // Parse text of PDF to extract development application details ...
                     // updateRow(db, value);
                 }
+                console.log("Parsed PDF " + pdfUrl + ".");
             });
         });
         readRows(db);

@@ -2,7 +2,7 @@ let cheerio = require("cheerio");
 let request = require("request");
 let sqlite3 = require("sqlite3").verbose();
 let pdf2json = require("pdf2json");
-let UrlParser = require("url");
+let urlparser = require("url");
 
 // Sets up an sqlite database.
 
@@ -34,7 +34,7 @@ function readRows(database) {
     
 function requestPage(url, callback) {
     console.log(`Requesting page: ${url}`);
-    request(url.href, (error, response, body) => {
+    request(url, (error, response, body) => {
         if (error) {
             console.log(`Error requesting page ${url}: ${error}`);
             return;
@@ -43,104 +43,59 @@ function requestPage(url, callback) {
     });
 }
 
-// Reads and parses the development application web pages.
+// Parses all PDF files found at the specified URL.
 
-function run(database) {
-    // Read the lodged applications page.
-    
-    let url = new UrlParser.URL("https://www.campbelltown.sa.gov.au/page.aspx?u=1973");
+function parsePdfs(database, url) {
+    let parsedUrl = new urlparser.URL(url);
+    let baseUrl = parsedUrl.origin + parsedUrl.pathname;
+
     requestPage(url, body => {
         // Use cheerio to find all URLs that refer to PDFs.
  
+        let pdfUrls = [];
         let $ = cheerio.load(body);
         $("div.uContentList a").each((index, element) => {
-            let baseUrl = url.origin + url.pathname;
-            let pdfUrl = new UrlParser.URL(element.attribs.href, baseUrl);
-            console.log(`Reading PDF from URL: ${pdfUrl}`)
+            let parsedPdfUrl = new urlparser.URL(element.attribs.href, baseUrl);
+            if (!pdfUrls.some(url => url === parsedPdfUrl.href))
+                pdfUrls.push(parsedPdfUrl.href);
+        });
+        console.log(`Found ${pdfUrls.length} PDF file(s) to read and parse.`);
 
-            // let testPdf = pdfjs.getDocument(pdfUrl.href).then(pdf => {
-            //     console.log(pdf);
-            //     let pagePromises = [];
-            //     for (let pageNumber = 1; pageNumber <= pdf.pdfInfo.numPages; pageNumber++) {
-            //         let page = pdf.getPage(pageNumber);
-            //         pagePromises.push(page.then(page => {
-            //             return page.getTextContent().then(textContent => {
-            //                 let text = "";
-            //                 let previousItem = null;
-            //                 for (let item of textContent.items) {
-            //                     //if (previousItem !== null && previousItem.str[previousItem.length - 1] !== ' ') {
-            //                     //    if (item.x < previousItem.x)
-            //                     //        text += "\r\n";
-            //                     //    else if (previousItem.y !== item.y && previousItem.str.match(/^(\s?[a-zA-Z])$|^(.+\s[a-zA-Z])$/) === null)
-            //                     //        text += " ";
-            //                     //}
-            //                     text += item.str + "\r\n";
-            //                     previousItem = item;
-            //                 }
-            //                 return text + "\r\n";
-            //             })
-            //         }))
-            //     }
-            //     Promise.all(pagePromises).then(texts => texts.join("")).then(text => {
-            //         console.log(text);
-            //     })
-            // });
+        // Read and parse each PDF, extracting the development application text.
 
+        for (let pdfUrl of pdfUrls) {
             let pdfParser = new pdf2json();
-            let pdfPipe = request({ url: pdfUrl.href, encoding: null }).pipe(pdfParser);
-            pdfPipe.on("pdfParser_dataError", error => {
-                console.error(error);
-            });
+            let pdfPipe = request({ url: pdfUrl, encoding: null }).pipe(pdfParser);
+            pdfPipe.on("pdfParser_dataError", error => console.error(error))
             pdfPipe.on("pdfParser_dataReady", pdf => {
-                let pdfRows = convertPdfToTable(pdf);
-
-                // let text = pdfParser.getMergedTextBlocksIfNeeded();
-                // // let text = pdfParser.getMergedTextBlocksIfNeeded();
-                // for (let page of pdf.formImage.Pages) {
-                //     // Parse text of PDF to extract development application details ...
-                //     // insertRow(database, value);
-                // }
-                console.log(`Parsed PDF ${pdfUrl}.`);
+                console.log(`Parsing PDF: ${pdfUrl}`);
+                let pdfRows = convertPdfToText(pdf);
             });
-        });
-        readRows(database);
-        // database.close();
-    });
+        }
 
-    return;
-
-    // Read the approved applications page.
-        
-    requestPage("https://www.campbelltown.sa.gov.au/page.aspx?u=1777", body => {
-        // Use cheerio to find things in the page with css selectors.
-        
-        let $ = cheerio.load(body);
-        $("div.uContentList a").each(() => {
-            let value = $(this).text().trim();
-            insertRow(database, value);
-        });
         readRows(database);
+
         // database.close();
     });
 }
 
-// Convert a PDF to a table.  This is based on pdf2table by Sam Decrock.
-// https://github.com/SamDecrock/pdf2table/blob/master/lib/pdf2table.js.
+// Convert a parsed PDF into an array of rows.  This is based on pdf2table by Sam Decrock.
+// See https://github.com/SamDecrock/pdf2table/blob/master/lib/pdf2table.js.
 
-function convertPdfToTable(pdf) {
+function convertPdfToText(pdf) {
     var comparer = (a, b) => (a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0);
 
     // Find the smallest y value between two texts with equal x values.
 
     var smallestYValueForPage = [];
 
-    for (var p = 0; p < pdf.formImage.Pages.length; p++) {
-        var page = pdf.formImage.Pages[p];
+    for (var pageIndex = 0; pageIndex < pdf.formImage.Pages.length; pageIndex++) {
+        var page = pdf.formImage.Pages[pageIndex];
         var smallestYValue = null;  // per page
         var textsWithSameXvalues = {};
 
-        for (var t = 0; t < page.Texts.length; t++) {
-            var text = page.Texts[t];
+        for (var textIndex = 0; textIndex < page.Texts.length; textIndex++) {
+            var text = page.Texts[textIndex];
             if(!textsWithSameXvalues[text.x])
                 textsWithSameXvalues[text.x] = [];
             textsWithSameXvalues[text.x].push(text);
@@ -171,35 +126,38 @@ function convertPdfToTable(pdf) {
 
     var myPages = [];
 
-    for (var p = 0; p < pdf.formImage.Pages.length; p++) {
-        var page = pdf.formImage.Pages[p];
+    for (var pageIndex = 0; pageIndex < pdf.formImage.Pages.length; pageIndex++) {
+        var page = pdf.formImage.Pages[pageIndex];
 
         var rows = [];  // store texts and their x positions in rows
 
-        for (var t = 0; t < page.Texts.length; t++) {
-            var text = page.Texts[t];
+        for (var textIndex = 0; textIndex < page.Texts.length; textIndex++) {
+            var text = page.Texts[textIndex];
 
             var foundRow = false;
-            for (var r = rows.length - 1; r >= 0; r--) {
-                // y value of Text falls within the y-value range, add text to row.
-                var maxYdifference = smallestYValueForPage[p];
-                if (rows[r].y - maxYdifference < text.y && text.y < rows[r].y + maxYdifference) {
+            for (var rowIndex = rows.length - 1; rowIndex >= 0; rowIndex--) {
+                // y value of text falls within the y-value range, add text to row.
+
+                var maxYdifference = smallestYValueForPage[pageIndex];
+                if (rows[rowIndex].y - maxYdifference < text.y && text.y < rows[rowIndex].y + maxYdifference) {
                     // Only add value of T to data (which is the actual text).
-                    for (var i = 0; i < text.R.length; i++)
-                        rows[r].data.push({ text: decodeURIComponent(text.R[i].T), x: text.x });
+
+                    for (var index = 0; index < text.R.length; index++)
+                        rows[rowIndex].data.push({ text: decodeURIComponent(text.R[index].T), x: text.x });
                     foundRow = true;
                 }
             };
 
             if (!foundRow) {
-                // Create new row.
+                // Create a new row.
+
                 var row = { y: text.y, data: [] };
 
-                // Add text to row.
+                // Add text to the row.
+
                 for (var index = 0; index < text.R.length; index++)
                     row.data.push({ text: decodeURIComponent(text.R[index].T), x: text.x });
 
-                // add row to rows:
                 rows.push(row);
             }
         };
@@ -218,12 +176,12 @@ function convertPdfToTable(pdf) {
 
     var rows = [];
 
-    for (var p = 0; p < myPages.length; p++) {
-        for (var r = 0; r < myPages[p].length; r++) {
+    for (var pageIndex = 0; pageIndex < myPages.length; pageIndex++) {
+        for (var rowIndex = 0; rowIndex < myPages[pageIndex].length; rowIndex++) {
             // Now that each row is made of objects extract the text property from the object.
 
             var rowEntries = []
-            var row = myPages[p][r].data;
+            var row = myPages[pageIndex][rowIndex].data;
             for (var index = 0; index < row.length; index++)
                 rowEntries.push(row[index].text);
 
@@ -234,6 +192,13 @@ function convertPdfToTable(pdf) {
     };
 
     return rows;
+}
+
+// Reads and parses the development application web pages.
+
+function run(database) {
+    parsePdfs(database, "https://www.campbelltown.sa.gov.au/page.aspx?u=1973");  // lodged applications
+    parsePdfs(database, "https://www.campbelltown.sa.gov.au/page.aspx?u=1777");  // approved applications
 }
 
 initializeDatabase(run);

@@ -1,10 +1,11 @@
-var cheerio = require("cheerio");
-var request = require("request");
-var sqlite3 = require("sqlite3").verbose();
+let cheerio = require("cheerio");
+let request = require("request");
+let sqlite3 = require("sqlite3").verbose();
+let pdf2json = require("pdf2json");
 
 function initDatabase(callback) {
     // Set up sqlite database.
-    var db = new sqlite3.Database("data.sqlite");
+    let db = new sqlite3.Database("data.sqlite");
     db.serialize(() => {
         db.run("create table if not exists data (name text)");
         callback(db);
@@ -13,7 +14,7 @@ function initDatabase(callback) {
 
 function updateRow(db, value) {
     // Insert some data.
-    var statement = db.prepare("insert into data values (?)");
+    let statement = db.prepare("insert into data values (?)");
     statement.run(value);
     statement.finalize();
 }
@@ -40,10 +41,18 @@ function run(db) {
     // Read the lodged applications page.
     fetchPage("https://www.campbelltown.sa.gov.au/page.aspx?u=1973", body => {
         // Use cheerio to find things in the page with css selectors.
-        var $ = cheerio.load(body);
-        var elements = $("div.uContentList a.href").each(() => {
-            var value = $(this).text().trim();
-            updateRow(db, value);
+        let $ = cheerio.load(body);
+        let elements = $("div.uContentList a.href").each(() => {
+            let pdfUrl = $(this).text().trim();
+            let pdfPipe = request({url: pdfUrl, encoding: null}).pipe(pdf2json);
+            pdfPipe.on("pdfParser_dataError", err => console.error(err));
+            pdfPipe.on("pdfParser_dataReady", pdf => {
+                // let pdf = pdfParser.getMergedTextBlocksIfNeeded();
+                for (let page of pdf.formImage.Pages) {
+                    // Parse text of PDF to extract development application details ...
+                    // updateRow(db, value);
+                }
+            }
         });
         readRows(db);
         db.close();
@@ -52,9 +61,9 @@ function run(db) {
     // Read the approved applications page.
     fetchPage("https://http://www.campbelltown.sa.gov.au/page.aspx?u=1777", body => {
         // Use cheerio to find things in the page with css selectors.
-        var $ = cheerio.load(body);
-        var elements = $("div.uContentList a.href").each(() => {
-            var value = $(this).text().trim();
+        let $ = cheerio.load(body);
+        let elements = $("div.uContentList a.href").each(() => {
+            let value = $(this).text().trim();
             updateRow(db, value);
         });
         readRows(db);

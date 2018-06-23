@@ -9,7 +9,7 @@ let urlparser = require("url");
 function initializeDatabase(callback) {
     let database = new sqlite3.Database("data.sqlite");
     database.serialize(() => {
-        database.run("create table if not exists [data] ([name] text)");
+        database.run("create table if not exists [data] ([council_reference] text, [address] text, [description] text, [info_url] text, [comment_url] text, [date_scraped] text, [date_received] text, [on_notice_from] text, [on_notice_to] text)");
         callback(database);
     });
 }
@@ -17,7 +17,7 @@ function initializeDatabase(callback) {
 // Inserts a row into the database.
 
 function insertRow(database, value) {
-    let sqlStatement = database.prepare("insert into [data] values (?)");
+    let sqlStatement = database.prepare("insert into [data] values (?, ?, ?, ?, ?, ?, ?, ?, ?)");
     sqlStatement.run(value);
     sqlStatement.finalize();
 }
@@ -30,7 +30,7 @@ function readRows(database) {
     });
 }
 
-// Reads a page using request.
+// Reads a page using a request.
     
 function requestPage(url, callback) {
     console.log(`Requesting page: ${url}`);

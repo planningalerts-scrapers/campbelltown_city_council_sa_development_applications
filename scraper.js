@@ -70,8 +70,24 @@ function parsePdfs(database, url) {
             pdfPipe.on("pdfParser_dataReady", pdf => {
                 console.log(`Parsing PDF: ${pdfUrl}`);
                 let pdfRows = convertPdfToText(pdf);
+                let isApplicationNumber = false;
+                let isAddress = false;
                 for (let row of pdfRows) {
-                    console.log(row);
+                    if (row[0].trim().substring(0, 20).replace(/[^\/]/g, "").length === 2) {  // if there are two forward slashes within the first 20 characters then it is probably an application number, for example, "162/0082/12"
+                        isAddress = false;
+                        console.log(`Application number: ${row}`)
+                        isApplicationNumber = true;
+                        isAddress = false;
+                    }
+                    else if (isApplicationNumber) {
+                        isApplicationNumber = false;
+                        isAddress = true;
+                        console.log(`    Address: ${row}`);
+                    } else if (isAddress) {
+                        console.log(`    Reason: ${row}`);
+                        isApplicationNumber = false;
+                        isAddress = false;
+                    }
                 }
             });
         }

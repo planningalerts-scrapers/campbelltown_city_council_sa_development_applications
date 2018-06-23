@@ -16,13 +16,13 @@ function initializeDatabase(callback) {
 
 // Inserts a row into the database.
 
-function insertRow(database, value) {
+function insertRow(database, councilReference, address, description, informationUrl, commentUrl, scrapedDate, receivedDate, noticeFromDate, noticeToDate) {
     let sqlStatement = database.prepare("insert into [data] values (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    sqlStatement.run(value);
+    sqlStatement.run([councilReference, address, description, informationUrl, commentUrl, scrapedDate, receivedDate, noticeFromDate, noticeToDate]);
     sqlStatement.finalize();
 }
 
-// Reads rows from the database.
+// Reads a row from the database.
 
 function readRows(database) {
     database.each("select [rowid] as [id], [name] from [data]", (error, row) => {
@@ -59,7 +59,7 @@ function parsePdfs(database, url) {
             if (!pdfUrls.some(url => url === parsedPdfUrl.href))
                 pdfUrls.push(parsedPdfUrl.href);
         });
-        console.log(`Found ${pdfUrls.length} PDF file(s) to read and parse.`);
+        console.log(`Found ${pdfUrls.length} PDF file(s) to read and parse at ${url}.`);
 
         // Read and parse each PDF, extracting the development application text.
 
@@ -70,6 +70,9 @@ function parsePdfs(database, url) {
             pdfPipe.on("pdfParser_dataReady", pdf => {
                 console.log(`Parsing PDF: ${pdfUrl}`);
                 let pdfRows = convertPdfToText(pdf);
+                for (let row of pdfRows) {
+                    console.log(row);
+                }
             });
         }
 
@@ -85,7 +88,7 @@ function parsePdfs(database, url) {
 function convertPdfToText(pdf) {
     var comparer = (a, b) => (a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0);
 
-    // Find the smallest y value between two texts with equal x values.
+    // Find the smallest Y co-ordinate for two texts with equal X co-ordinates.
 
     var smallestYValueForPage = [];
 
@@ -96,12 +99,12 @@ function convertPdfToText(pdf) {
 
         for (var textIndex = 0; textIndex < page.Texts.length; textIndex++) {
             var text = page.Texts[textIndex];
-            if(!textsWithSameXvalues[text.x])
+            if (!textsWithSameXvalues[text.x])
                 textsWithSameXvalues[text.x] = [];
             textsWithSameXvalues[text.x].push(text);
         }
 
-        // Find smallest y distance.
+        // Find smallest Y distance.
 
         for (var x in textsWithSameXvalues) {
             var texts = textsWithSameXvalues[x];
@@ -122,21 +125,21 @@ function convertPdfToText(pdf) {
         smallestYValueForPage.push(smallestYValue);
     }
 
-    // Find texts with similar y values (in the range of y - smallestYValue to y + smallestYValue).
+    // Find texts with similar Y values (in the range of Y - smallestYValue to Y + smallestYValue).
 
     var myPages = [];
 
     for (var pageIndex = 0; pageIndex < pdf.formImage.Pages.length; pageIndex++) {
         var page = pdf.formImage.Pages[pageIndex];
 
-        var rows = [];  // store texts and their x positions in rows
+        var rows = [];  // store texts and their X positions in rows
 
         for (var textIndex = 0; textIndex < page.Texts.length; textIndex++) {
             var text = page.Texts[textIndex];
 
             var foundRow = false;
             for (var rowIndex = rows.length - 1; rowIndex >= 0; rowIndex--) {
-                // y value of text falls within the y-value range, add text to row.
+                // Y value of text falls within the Y value range, add text to row.
 
                 var maxYdifference = smallestYValueForPage[pageIndex];
                 if (rows[rowIndex].y - maxYdifference < text.y && text.y < rows[rowIndex].y + maxYdifference) {

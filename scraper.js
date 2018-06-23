@@ -73,18 +73,17 @@ function parsePdfs(database, url) {
                 let isApplicationNumber = false;
                 let isAddress = false;
                 for (let row of pdfRows) {
-                    if (row[0].trim().substring(0, 20).replace(/[^\/]/g, "").length === 2) {  // if there are two forward slashes within the first 20 characters then it is probably an application number, for example, "162/0082/12"
+                    if (row[0].trim().substring(0, 20).replace(/[^\/]/g, "").length === 2 && !row[0].trim().substring(0, 10).match(/^\d\d\\\d\d\\\d\d\d\d$/g)) {  // if there are two forward slashes within the first 20 characters then it is probably an application number (and it is not formatted as a date such as "31/12/2008"), for example, "162/0082/12"
                         isAddress = false;
-                        console.log(`Application number: ${row}`)
+                        console.log(`${pdfUrl} Application number: ${row}`)
                         isApplicationNumber = true;
                         isAddress = false;
-                    }
-                    else if (isApplicationNumber) {
+                    } else if (isApplicationNumber) {
                         isApplicationNumber = false;
                         isAddress = true;
-                        console.log(`    Address: ${row}`);
+                        console.log(`${pdfUrl}     Address: ${row}`);
                     } else if (isAddress) {
-                        console.log(`    Reason: ${row}`);
+                        console.log(`${pdfUrl}     Reason: ${row}`);
                         isApplicationNumber = false;
                         isAddress = false;
                     }

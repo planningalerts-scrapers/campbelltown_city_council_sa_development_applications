@@ -4,3 +4,6 @@ data.sqlite
 # Ignore dependency cache.
 node_modules
 package-lock.json
+
+# Ignore Visual Studio Code files.
+.vscode

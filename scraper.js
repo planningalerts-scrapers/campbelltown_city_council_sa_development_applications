@@ -86,19 +86,19 @@ function parsePdfs(database, url) {
 // See https://github.com/SamDecrock/pdf2table/blob/master/lib/pdf2table.js.
 
 function convertPdfToText(pdf) {
-    var comparer = (a, b) => (a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0);
+    let comparer = (a, b) => (a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0);
 
     // Find the smallest Y co-ordinate for two texts with equal X co-ordinates.
 
-    var smallestYValueForPage = [];
+    let smallestYValueForPage = [];
 
-    for (var pageIndex = 0; pageIndex < pdf.formImage.Pages.length; pageIndex++) {
-        var page = pdf.formImage.Pages[pageIndex];
-        var smallestYValue = null;  // per page
-        var textsWithSameXvalues = {};
+    for (let pageIndex = 0; pageIndex < pdf.formImage.Pages.length; pageIndex++) {
+        let page = pdf.formImage.Pages[pageIndex];
+        let smallestYValue = null;  // per page
+        let textsWithSameXvalues = {};
 
-        for (var textIndex = 0; textIndex < page.Texts.length; textIndex++) {
-            var text = page.Texts[textIndex];
+        for (let textIndex = 0; textIndex < page.Texts.length; textIndex++) {
+            let text = page.Texts[textIndex];
             if (!textsWithSameXvalues[text.x])
                 textsWithSameXvalues[text.x] = [];
             textsWithSameXvalues[text.x].push(text);
@@ -106,13 +106,13 @@ function convertPdfToText(pdf) {
 
         // Find smallest Y distance.
 
-        for (var x in textsWithSameXvalues) {
-            var texts = textsWithSameXvalues[x];
-            for (var i = 0; i < texts.length; i++) {
-                var firstYvalue = texts[i].y;
-                for (var j = 0; j < texts.length; j++) {
+        for (let x in textsWithSameXvalues) {
+            let texts = textsWithSameXvalues[x];
+            for (let i = 0; i < texts.length; i++) {
+                let firstYvalue = texts[i].y;
+                for (let j = 0; j < texts.length; j++) {
                     if (texts[i] !== texts[j]) {
-                        var distance = Math.abs(texts[j].y - texts[i].y);
+                        let distance = Math.abs(texts[j].y - texts[i].y);
                         if (smallestYValue === null || distance < smallestYValue)
                             smallestYValue = distance;
                     }
@@ -127,25 +127,25 @@ function convertPdfToText(pdf) {
 
     // Find texts with similar Y values (in the range of Y - smallestYValue to Y + smallestYValue).
 
-    var myPages = [];
+    let myPages = [];
 
-    for (var pageIndex = 0; pageIndex < pdf.formImage.Pages.length; pageIndex++) {
-        var page = pdf.formImage.Pages[pageIndex];
+    for (let pageIndex = 0; pageIndex < pdf.formImage.Pages.length; pageIndex++) {
+        let page = pdf.formImage.Pages[pageIndex];
 
-        var rows = [];  // store texts and their X positions in rows
+        let rows = [];  // store texts and their X positions in rows
 
-        for (var textIndex = 0; textIndex < page.Texts.length; textIndex++) {
-            var text = page.Texts[textIndex];
+        for (let textIndex = 0; textIndex < page.Texts.length; textIndex++) {
+            let text = page.Texts[textIndex];
 
-            var foundRow = false;
-            for (var rowIndex = rows.length - 1; rowIndex >= 0; rowIndex--) {
+            let foundRow = false;
+            for (let rowIndex = rows.length - 1; rowIndex >= 0; rowIndex--) {
                 // Y value of text falls within the Y value range, add text to row.
 
-                var maxYdifference = smallestYValueForPage[pageIndex];
+                let maxYdifference = smallestYValueForPage[pageIndex];
                 if (rows[rowIndex].y - maxYdifference < text.y && text.y < rows[rowIndex].y + maxYdifference) {
                     // Only add value of T to data (which is the actual text).
 
-                    for (var index = 0; index < text.R.length; index++)
+                    for (let index = 0; index < text.R.length; index++)
                         rows[rowIndex].data.push({ text: decodeURIComponent(text.R[index].T), x: text.x });
                     foundRow = true;
                 }
@@ -154,11 +154,11 @@ function convertPdfToText(pdf) {
             if (!foundRow) {
                 // Create a new row.
 
-                var row = { y: text.y, data: [] };
+                let row = { y: text.y, data: [] };
 
                 // Add text to the row.
 
-                for (var index = 0; index < text.R.length; index++)
+                for (let index = 0; index < text.R.length; index++)
                     row.data.push({ text: decodeURIComponent(text.R[index].T), x: text.x });
 
                 rows.push(row);
@@ -167,7 +167,7 @@ function convertPdfToText(pdf) {
 
         // Sort each extracted row.
 
-        for (var index = 0; index < rows.length; index++)
+        for (let index = 0; index < rows.length; index++)
             rows[index].data.sort(comparer);
 
         // Add rows to pages.
@@ -177,15 +177,15 @@ function convertPdfToText(pdf) {
 
     // Flatten pages into rows.
 
-    var rows = [];
+    let rows = [];
 
-    for (var pageIndex = 0; pageIndex < myPages.length; pageIndex++) {
-        for (var rowIndex = 0; rowIndex < myPages[pageIndex].length; rowIndex++) {
+    for (let pageIndex = 0; pageIndex < myPages.length; pageIndex++) {
+        for (let rowIndex = 0; rowIndex < myPages[pageIndex].length; rowIndex++) {
             // Now that each row is made of objects extract the text property from the object.
 
-            var rowEntries = []
-            var row = myPages[pageIndex][rowIndex].data;
-            for (var index = 0; index < row.length; index++)
+            let rowEntries = []
+            let row = myPages[pageIndex][rowIndex].data;
+            for (let index = 0; index < row.length; index++)
                 rowEntries.push(row[index].text);
 
             // Append the extracted and ordered text into the return rows.

@@ -1,3 +1,6 @@
+// Parses the lodged development application PDF files found at the South Australian Campbelltown
+// City Council web site and places them in a database.
+
 let cheerio = require("cheerio");
 let request = require("request");
 let sqlite3 = require("sqlite3").verbose();
@@ -98,14 +101,14 @@ function parsePdfs(database, url) {
                     // very likely an application number (and it is not formatted as a date such
                     // as "31/12/2008").  For example, "162/0082/12".
                     //
-                    // Note that sometimes the lodgement date will not be correctly obtained.  For
-                    // example, if the date is split across two elements in a PDF row:
+                    // Note that sometimes the lodgement date will be difficult to  correctly
+                    // obtain.  For example, if the date is split across two elements in a PDF
+                    // row:
                     //
                     //     ["26/10/2017", "02/", "11/2017", "Allot 1 DP ..."]
                     //
-                    // No effort is made to resolve this situation (because the lodgement date is
-                    // not that important).
-
+                    // The parseLodgementDate function makes an effort to resolve this situation.
+                    
                     let parsedApplicationNumber = parseApplicationNumber(pdfRow);
                     if (parsedApplicationNumber !== null) {
                         // Extract the development application number and lodgement date.
@@ -113,14 +116,14 @@ function parsePdfs(database, url) {
                         applicationNumber = parsedApplicationNumber;
                         address = null;
                         reason = null;
-                        lodgementDate = (pdfRow.length >= 3) ? moment(pdfRow[2].trim(), "D/MM/YYYY", true) : null;  // allows the leading zero of the day to be omitted
+                        lodgementDate = parseLodgementDate(pdfRow, 2, "nnn/nnnn/nn".length);  // dates appear after the application number
                         haveApplicationNumber = true;
                         haveAddress = false;
                     } else if (haveApplicationNumber && !haveAddress) {
                         // Attempt to extract the lodgement date (if it was not found earlier).
 
-                        if (pdfRow.length >= 2 && (lodgementDate === null || !lodgementDate.isValid()))
-                            lodgementDate = moment(pdfRow[1].trim(), "D/MM/YYYY", true);  // allows the leading zero of the day to be omitted
+                        if (lodgementDate === null)
+                            lodgementDate = parseLodgementDate(pdfRow, 1, 0);
 
                         // Extract the address of the development application.  It is assumed to
                         // always appear on the next line after the text "Property Address".
@@ -143,7 +146,7 @@ function parsePdfs(database, url) {
                                 informationUrl: informationUrl,
                                 commentUrl: commentUrl,
                                 scrapeDate: scrapeDate,
-                                lodgementDate: ((lodgementDate !== null && lodgementDate.isValid()) ? lodgementDate.format("YYYY-MM-DD") : null) });
+                                lodgementDate: ((lodgementDate === null) ? null : lodgementDate.format("YYYY-MM-DD")) });
                             haveApplicationNumber = false;
                             haveAddress = false;
                         }
@@ -155,14 +158,10 @@ function parsePdfs(database, url) {
                 // rows in a table.  If the same development application number already exists on
                 // a row then that existing row will not be replaced.
 
-                for (let developmentApplication of developmentApplications) {
-                    console.log(developmentApplication);
+                for (let developmentApplication of developmentApplications)
                     insertRow(database, developmentApplication);
-                }
             });
         }
-
-        // database.close();
     });
 }
 
@@ -170,10 +169,35 @@ function parsePdfs(database, url) {
 
 function parseApplicationNumber(pdfRow) {
     // Assume a strict format of "nnn/nnnn/nn" for the application number to avoid any confusion
-    // with (which are similarly formatted).  For example, "170/1318/14".
+    // with dates (which are similarly formatted).  For example, "170/1318/14".
 
-    let text = pdfRow.join("").trim().substring(0, 11);
+    let text = pdfRow.join("").trim().substring(0, "nnn/nnnn/nn".length);
     return /^[0-9][0-9][0-9]\/[0-9][0-9][0-9][0-9]\/[0-9][0-9]$/.test(text) ? text : null;
+}
+
+// Parses a lodgement date from the specified PDF row of text.
+
+function parseLodgementDate(pdfRow, columnIndex, characterIndex) {
+    // For example,
+    //
+    // [ "170/0298/18", "07/11/2017", "06/04/2018", "Allot 4 D", "P ..." ]
+
+    let lodgementDate = null;
+    if (pdfRow.length >= 3) {
+        lodgementDate = moment(pdfRow[columnIndex].trim(), "D/MM/YYYY", true);  // allows the leading zero of the day to be omitted
+        if (lodgementDate.isValid())
+            return lodgementDate;
+    }
+
+    // For example,
+    //
+    // [ "170/0298/18", "07/", "11/2017", "06/04/2018", "Allot 4 D", "P ..." ]
+    // [ "2", "0/11/2017", "20/11/2017", "ALLOT 100 FP ..." ]
+
+    let text = pdfRow.join("").substring(characterIndex);  // for example, "07/11/201706/04/2018Allot 4 DP ..."
+    text = text.substring("DD/MM/YYYY".length, "DD/MM/YYYY".length + "DD/MM/YYYY".length);  // this assumes the leading zero of the day has not been omitted
+    lodgementDate = moment(text, "DD/MM/YYYY", true);
+    return lodgementDate.isValid() ? lodgementDate : null;
 }
 
 // Convert a parsed PDF into an array of rows.  This function is based on pdf2table by Sam Decrock.
@@ -257,8 +281,8 @@ function convertPdfToText(pdf) {
             for (let rowIndex = rows.length - 1; rowIndex >= 0; rowIndex--) {
                 // Y value of text falls within the Y value range, add text to row.
 
-                let maxYdifference = smallestYValueForPage[pageIndex];
-                if (rows[rowIndex].y - maxYdifference < text.y && text.y < rows[rowIndex].y + maxYdifference) {
+                let maximumYdifference = smallestYValueForPage[pageIndex];
+                if (rows[rowIndex].y - maximumYdifference < text.y && text.y < rows[rowIndex].y + maximumYdifference) {
                     // Only add value of T to data (which is the actual text).
 
                     for (let index = 0; index < text.R.length; index++)
@@ -277,12 +301,12 @@ function convertPdfToText(pdf) {
             }
         };
 
-        // Sort each extracted row horizontally by x co-ordinate.
+        // Sort each extracted row horizontally by X co-ordinate.
 
         for (let index = 0; index < rows.length; index++)
             rows[index].data.sort(xComparer);
 
-        // Sort rows vertically by y co-ordinate.
+        // Sort rows vertically by Y co-ordinate.
 
         rows.sort(yComparer);
 
@@ -313,7 +337,7 @@ function convertPdfToText(pdf) {
     return rows;
 }
 
-// Reads and parses the development application web pages.  The results are inserted into a
+// Reads and parses the development application web page.  The results are inserted into a
 // database.
 
 function run(database) {

@@ -50,8 +50,6 @@ function parsePdfs(database, url) {
     let parsedUrl = new urlparser.URL(url);
     let baseUrl = parsedUrl.origin + parsedUrl.pathname;
 
-    let test = moment.isDate("1/1/2000");
-    
     requestPage(url, body => {
         // Use cheerio to find all URLs that refer to PDFs.
  
@@ -73,24 +71,47 @@ function parsePdfs(database, url) {
             pdfPipe.on("pdfParser_dataReady", pdf => {
                 console.log(`Parsing PDF: ${pdfUrl}`);
                 let pdfRows = convertPdfToText(pdf);
-                let isApplicationNumber = false;
-                let isAddress = false;
+
+                let developmentApplications = [];
+                let haveApplicationNumber = false;
+                let haveAddress = false;
+                let applicationNumber = null;
+                let address = null;
+                let reason = null;
+                let lodgementDate = null;
+
                 for (let row of pdfRows) {
-                    if (row[0].trim().substring(0, 20).replace(/[^\/]/g, "").length === 2 && !row[0].trim().substring(0, 10).match(/^\d\d\\\d\d\\\d\d\d\d$/g)) {  // if there are two forward slashes within the first 20 characters then it is probably an application number (and it is not formatted as a date such as "31/12/2008"), for example, "162/0082/12"
-                        isAddress = false;
-                        console.log(`${pdfUrl} Application number: ${row}`)
-                        isApplicationNumber = true;
-                        isAddress = false;
-                    } else if (isApplicationNumber) {
-                        isApplicationNumber = false;
-                        isAddress = true;
-                        console.log(`${pdfUrl}     Address: ${row}`);
-                    } else if (isAddress) {
-                        console.log(`${pdfUrl}     Reason: ${row}`);
-                        isApplicationNumber = false;
-                        isAddress = false;
+                    // If there are two forward slashes within the first 20 characters then it is
+                    // very likely an application number (and it is not formatted as a date such
+                    // as "31/12/2008").  For example, "162/0082/12".
+
+                    if (row[0].trim().substring(0, 20).replace(/[^\/]/g, "").length === 2 && !moment(row[0].trim().substring(0, 10), "DD/MM/YYYY", true).isValid()) {
+                        applicationNumber = row[0].trim();
+                        address = null;
+                        reason = null;
+                        lodgementDate = moment(row[2].trim(), "D/MM/YYYY", true);  // allow the leading zero of the day to be omitted
+                        haveApplicationNumber = true;
+                        haveAddress = false;
+                    } else if (haveApplicationNumber) {
+                        address = row.join("").trim();
+                        // console.log(`${pdfUrl}     Address: ${address}`);
+                        haveApplicationNumber = false;
+                        haveAddress = true;
+                    } else if (haveAddress) {
+                        reason = row.join("").trim();
+                        // console.log(`${pdfUrl}     Reason: ${reason}`);
+                        haveApplicationNumber = false;
+                        haveAddress = false;
+                        developmentApplications.push({
+                            applicationNumber: applicationNumber,
+                            address: address,
+                            reason: reason,
+                            lodgementDate: (lodgementDate.isValid() ? lodgementDate.format("YYYY-MM-DD") : null) });
                     }
                 }
+
+                for (let developmentApplication of developmentApplications)
+                    console.log(developmentApplication);
             });
         }
 

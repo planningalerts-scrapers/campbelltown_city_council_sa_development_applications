@@ -69,13 +69,15 @@ function parsePdfs(database, url) {
         // Read and parse each PDF, extracting the development application text.
 
         for (let pdfUrl of pdfUrls) {
-/////////////// TESTING            
-if (!pdfUrl.includes("Lodged%20-%20November%202017"))
-    continue;
+            // Parse the PDF into a collection of PDF rows.  Each PDF row is simply an array of
+            // strings, being the text that has been parsed from the PDF.
+
             let pdfParser = new pdf2json();
             let pdfPipe = request({ url: pdfUrl, encoding: null }).pipe(pdfParser);
             pdfPipe.on("pdfParser_dataError", error => console.error(error))
             pdfPipe.on("pdfParser_dataReady", pdf => {
+                // Convert the JSON representation of the PDF into a collection of PDF rows.
+
                 console.log(`Parsing PDF: ${pdfUrl}`);
                 let pdfRows = convertPdfToText(pdf);
 
@@ -90,38 +92,50 @@ if (!pdfUrl.includes("Lodged%20-%20November%202017"))
                 let scrapeDate = moment().format("YYYY-MM-DD");
                 let lodgementDate = null;
 
-                let previousRow = null;
-                for (let row of pdfRows) {
+                let previousPdfRow = null;
+                for (let pdfRow of pdfRows) {
                     // If there are two forward slashes within the first 20 characters then it is
                     // very likely an application number (and it is not formatted as a date such
                     // as "31/12/2008").  For example, "162/0082/12".
-// console.log(row);
-                    let parsedApplicationNumber = parseApplicationNumber(row);
+                    //
+                    // Note that sometimes the lodgement date will not be correctly obtained.  For
+                    // example, if the date is split across two elements in a PDF row:
+                    //
+                    //     ["26/10/2017", "02/", "11/2017", "Allot 1 DP ..."]
+                    //
+                    // No effort is made to resolve this situation (because the lodgement date is
+                    // not that important).
+
+                    let parsedApplicationNumber = parseApplicationNumber(pdfRow);
                     if (parsedApplicationNumber !== null) {
                         // Extract the development application number and lodgement date.
 
                         applicationNumber = parsedApplicationNumber;
                         address = null;
                         reason = null;
-                        lodgementDate = (row.length >= 3) ? moment(row[2].trim(), "D/MM/YYYY", true) : null;  // allows the leading zero of the day to be omitted
+                        lodgementDate = (pdfRow.length >= 3) ? moment(pdfRow[2].trim(), "D/MM/YYYY", true) : null;  // allows the leading zero of the day to be omitted
                         haveApplicationNumber = true;
                         haveAddress = false;
                     } else if (haveApplicationNumber && !haveAddress) {
-                        // Extract the address of the development application.
+                        // Attempt to extract the lodgement date (if it was not found earlier).
 
-                        if (previousRow !== null && previousRow.join("").replace(/\s/g, "").toLowerCase().startsWith("propertyaddress")) {
-                            address = row.join("").trim();
+                        if (pdfRow.length >= 2 && (lodgementDate === null || !lodgementDate.isValid()))
+                            lodgementDate = moment(pdfRow[1].trim(), "D/MM/YYYY", true);  // allows the leading zero of the day to be omitted
+
+                        // Extract the address of the development application.  It is assumed to
+                        // always appear on the next line after the text "Property Address".
+
+                        if (previousPdfRow !== null && previousPdfRow.join("").replace(/\s/g, "").toLowerCase().startsWith("propertyaddress")) {
+                            address = pdfRow.join("").trim();
                             haveApplicationNumber = true;
                             haveAddress = true;
                         }
                     } else if (haveApplicationNumber && haveAddress) {
-                        // Extract the reason for the development application.  This is assumed
-                        // to be the end of the information for this development application.
+                        // Extract the reason for the development application.  It is assumed to
+                        // always appear on the next line after the text "Nature of Development".
 
-                        if (previousRow !== null && previousRow.join("").replace(/\s/g, "").toLowerCase().startsWith("natureofdevelopment")) {
-                            reason = row.join("").trim();
-                            haveApplicationNumber = false;
-                            haveAddress = false;
+                        if (previousPdfRow !== null && previousPdfRow.join("").replace(/\s/g, "").toLowerCase().startsWith("natureofdevelopment")) {
+                            reason = pdfRow.join("").trim();
                             developmentApplications.push({
                                 applicationNumber: applicationNumber,
                                 address: address,
@@ -130,14 +144,20 @@ if (!pdfUrl.includes("Lodged%20-%20November%202017"))
                                 commentUrl: commentUrl,
                                 scrapeDate: scrapeDate,
                                 lodgementDate: ((lodgementDate !== null && lodgementDate.isValid()) ? lodgementDate.format("YYYY-MM-DD") : null) });
+                            haveApplicationNumber = false;
+                            haveAddress = false;
                         }
                     }
-                    previousRow = row;
+                    previousPdfRow = pdfRow;
                 }
+
+                // Insert all the development applications that were found into the database as
+                // rows in a table.  If the same development application number already exists on
+                // a row then that existing row will not be replaced.
 
                 for (let developmentApplication of developmentApplications) {
                     console.log(developmentApplication);
-                    insertRow(database, developmentApplication)
+                    insertRow(database, developmentApplication);
                 }
             });
         }
@@ -148,27 +168,12 @@ if (!pdfUrl.includes("Lodged%20-%20November%202017"))
 
 // Parses an application number from the specified PDF row of text.
 
-function parseApplicationNumber(row) {
-    // If there are two forward slashes in the first element of the row and it is not a date then
-    // assume that the first element is an application number.  For example, "170/1318/14"
+function parseApplicationNumber(pdfRow) {
+    // Assume a strict format of "nnn/nnnn/nn" for the application number to avoid any confusion
+    // with (which are similarly formatted).  For example, "170/1318/14".
 
-    let text = row[0].trim();
-    if (text.length >= 6 && text.length <= 16 && row[0].replace(/[^\/]/g, "").length === 2 && !moment(text.substring(0, 10), "DD/MM/YYYY", true).isValid())
-        return text;
-
-    // If there is one slash in the first element and one slash in the second element and together
-    // they are not a date then assume the application number is split across two elements of the
-    // row.  For example, "170/1" and "318/14".
-
-    if (row.length < 2)
-        return null;
-    text = row[0].trim() + row[1].trim();
-    if (text.length >= 6 && text.length <= 16 && row[0].replace(/[^\/]/g, "").length === 1 && row[1].replace(/[^\/]/g, "").length === 1 && !moment(text.substring(0, 10), "DD/MM/YYYY", true).isValid())
-        return text;
-
-    // Assume that an application number is not present.
-
-    return null;
+    let text = pdfRow.join("").trim().substring(0, 11);
+    return /^[0-9][0-9][0-9]\/[0-9][0-9][0-9][0-9]\/[0-9][0-9]$/.test(text) ? text : null;
 }
 
 // Convert a parsed PDF into an array of rows.  This function is based on pdf2table by Sam Decrock.
@@ -197,7 +202,8 @@ function parseApplicationNumber(row) {
 // SOFTWARE.
 
 function convertPdfToText(pdf) {
-    let comparer = (a, b) => (a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0);
+    let xComparer = (a, b) => (a.x > b.x) ? 1 : ((a.x < b.x) ? -1 : 0);
+    let yComparer = (a, b) => (a.y > b.y) ? 1 : ((a.y < b.y) ? -1 : 0);
 
     // Find the smallest Y co-ordinate for two texts with equal X co-ordinates.
 
@@ -271,10 +277,14 @@ function convertPdfToText(pdf) {
             }
         };
 
-        // Sort each extracted row.
+        // Sort each extracted row horizontally by x co-ordinate.
 
         for (let index = 0; index < rows.length; index++)
-            rows[index].data.sort(comparer);
+            rows[index].data.sort(xComparer);
+
+        // Sort rows vertically by y co-ordinate.
+
+        rows.sort(yComparer);
 
         // Add rows to pages.
 

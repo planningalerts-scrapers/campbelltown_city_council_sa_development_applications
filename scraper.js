@@ -3,6 +3,7 @@ let request = require("request");
 let sqlite3 = require("sqlite3").verbose();
 let pdf2json = require("pdf2json");
 let urlparser = require("url");
+let moment = require("moment");
 
 // Sets up an sqlite database.
 
@@ -49,6 +50,8 @@ function parsePdfs(database, url) {
     let parsedUrl = new urlparser.URL(url);
     let baseUrl = parsedUrl.origin + parsedUrl.pathname;
 
+    let test = moment.isDate("1/1/2000");
+    
     requestPage(url, body => {
         // Use cheerio to find all URLs that refer to PDFs.
  

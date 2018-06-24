@@ -1,1 +1,1 @@
-This is a scraper that runs on [Morph](https://morph.io).  It scrapes lodged and approved development applications from the South Australian [Campbelltown City Council web site](https://www.campbelltown.sa.gov.au).
+This is a scraper that runs on [Morph](https://morph.io).  It scrapes lodged development applications from the South Australian [Campbelltown City Council web site](https://www.campbelltown.sa.gov.au).

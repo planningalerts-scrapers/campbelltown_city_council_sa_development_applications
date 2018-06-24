@@ -5,30 +5,35 @@ let pdf2json = require("pdf2json");
 let urlparser = require("url");
 let moment = require("moment");
 
+const LodgedApplicationsUrl = "https://www.campbelltown.sa.gov.au/page.aspx?u=1973";
+const ApprovedApplicationsUrl = "https://www.campbelltown.sa.gov.au/page.aspx?u=1777";
+
 // Sets up an sqlite database.
 
 function initializeDatabase(callback) {
     let database = new sqlite3.Database("data.sqlite");
     database.serialize(() => {
-        database.run("create table if not exists [data] ([council_reference] text, [address] text, [description] text, [info_url] text, [comment_url] text, [date_scraped] text, [date_received] text, [on_notice_from] text, [on_notice_to] text)");
+        database.run("create table if not exists [data] ([council_reference] text primary key, [address] text, [description] text, [info_url] text, [comment_url] text, [date_scraped] text, [date_received] text, [on_notice_from] text, [on_notice_to] text)");
         callback(database);
     });
 }
 
-// Inserts a row into the database.
+// Inserts a row in the database if it does not already exist.
 
-function insertRow(database, councilReference, address, description, informationUrl, commentUrl, scrapedDate, receivedDate, noticeFromDate, noticeToDate) {
-    let sqlStatement = database.prepare("insert into [data] values (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    sqlStatement.run([councilReference, address, description, informationUrl, commentUrl, scrapedDate, receivedDate, noticeFromDate, noticeToDate]);
-    sqlStatement.finalize();
-}
-
-// Reads a row from the database.
-
-function readRows(database) {
-    database.each("select [rowid] as [id], [name] from [data]", (error, row) => {
-        console.log(row.id + ": " + row.name);
-    });
+function insertRow(developmentApplication) {
+    let sqlStatement = database.prepare("insert or ignore into [data] values (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    sqlStatement.run([
+        developmentApplication.applicationNumber,
+        developmentApplication.address,
+        developmentApplication.reason,
+        developmentApplication.informationUrl,
+        developmentApplication.commentUrl,
+        developmentApplication.scrapeDate,
+        developmentApplication.lodgementDate,
+        null,
+        null
+    ]);
+    sqlStatement.finalize();  // releases any locks
 }
 
 // Reads a page using a request.
@@ -78,6 +83,9 @@ function parsePdfs(database, url) {
                 let applicationNumber = null;
                 let address = null;
                 let reason = null;
+                let informationUrl = null;
+                let commentUrl = null;
+                let scrapeDate = moment().format("YYYY-MM-DD");
                 let lodgementDate = null;
 
                 for (let row of pdfRows) {
@@ -86,6 +94,8 @@ function parsePdfs(database, url) {
                     // as "31/12/2008").  For example, "162/0082/12".
 
                     if (row[0].trim().substring(0, 20).replace(/[^\/]/g, "").length === 2 && !moment(row[0].trim().substring(0, 10), "DD/MM/YYYY", true).isValid()) {
+                        // Extract the development application number and lodgement date.
+
                         applicationNumber = row[0].trim();
                         address = null;
                         reason = null;
@@ -93,24 +103,31 @@ function parsePdfs(database, url) {
                         haveApplicationNumber = true;
                         haveAddress = false;
                     } else if (haveApplicationNumber) {
+                        // Extract the address of th development application.
+
                         address = row.join("").trim();
-                        // console.log(`${pdfUrl}     Address: ${address}`);
                         haveApplicationNumber = false;
                         haveAddress = true;
                     } else if (haveAddress) {
+                        // Extract the reason for the development application.  This is assumed
+                        // to be the end of the information for this development application.
+
                         reason = row.join("").trim();
-                        // console.log(`${pdfUrl}     Reason: ${reason}`);
                         haveApplicationNumber = false;
                         haveAddress = false;
                         developmentApplications.push({
                             applicationNumber: applicationNumber,
                             address: address,
                             reason: reason,
+                            informationUrl: informationUrl,
+                            commentUrl: commentUrl,
+                            scrapeDate: scrapeDate,
                             lodgementDate: (lodgementDate.isValid() ? lodgementDate.format("YYYY-MM-DD") : null) });
                     }
                 }
 
                 for (let developmentApplication of developmentApplications)
+                    insertRow(developmentApplication)
                     console.log(developmentApplication);
             });
         }
@@ -236,11 +253,12 @@ function convertPdfToText(pdf) {
     return rows;
 }
 
-// Reads and parses the development application web pages.
+// Reads and parses the development application web pages.  The results are inserted into a
+// database.
 
 function run(database) {
-    parsePdfs(database, "https://www.campbelltown.sa.gov.au/page.aspx?u=1973");  // lodged applications
-    parsePdfs(database, "https://www.campbelltown.sa.gov.au/page.aspx?u=1777");  // approved applications
+    parsePdfs(database, LodgedApplicationsUrl);
+    parsePdfs(database, ApprovedApplicationsUrl);
 }
 
 initializeDatabase(run);

@@ -1,5 +1,8 @@
 // Parses the lodged development application PDF files found at the South Australian Campbelltown
 // City Council web site and places them in a database.
+//
+// Michael Bone
+// 24th June 2018
 
 let cheerio = require("cheerio");
 let request = require("request");
@@ -64,7 +67,7 @@ function parsePdfs(database, url) {
         let $ = cheerio.load(body);
         $("div.uContentList a").each((index, element) => {
             let parsedPdfUrl = new urlparser.URL(element.attribs.href, baseUrl);
-            if (!pdfUrls.some(url => url === parsedPdfUrl.href))
+            if (!pdfUrls.some(url => url === parsedPdfUrl.href))  // avoid duplicates
                 pdfUrls.push(parsedPdfUrl.href);
         });
         console.log(`Found ${pdfUrls.length} PDF file(s) to read and parse at ${url}.`);

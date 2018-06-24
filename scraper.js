@@ -11,7 +11,7 @@ let pdf2json = require("pdf2json");
 let urlparser = require("url");
 let moment = require("moment");
 
-const LodgedApplicationsUrl = "https://www.campbelltown.sa.gov.au/page.aspx?u=1973";
+const LodgedApplicationsUrl = "http://www.campbelltown.sa.gov.au/page.aspx?u=1973";
 
 // Sets up an sqlite database.
 

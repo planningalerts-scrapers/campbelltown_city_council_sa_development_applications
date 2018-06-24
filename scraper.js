@@ -104,7 +104,7 @@ function parsePdfs(database, url) {
                     // very likely an application number (and it is not formatted as a date such
                     // as "31/12/2008").  For example, "162/0082/12".
                     //
-                    // Note that sometimes the lodgement date will be difficult to  correctly
+                    // Note that sometimes the lodgement date will be difficult to correctly
                     // obtain.  For example, if the date is split across two elements in a PDF
                     // row:
                     //

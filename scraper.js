@@ -26,7 +26,7 @@ function initializeDatabase(callback) {
 
 // Inserts a row in the database if it does not already exist.
 
-function insertRow(database, developmentApplication) {
+function insertRow(database, pdfFileName, developmentApplication) {
     let sqlStatement = database.prepare("insert or ignore into [data] values (?, ?, ?, ?, ?, ?, ?, ?, ?)");
     sqlStatement.run([
         developmentApplication.applicationNumber,
@@ -38,8 +38,15 @@ function insertRow(database, developmentApplication) {
         developmentApplication.lodgementDate,
         null,
         null
-    ]);
-    sqlStatement.finalize();  // releases any locks
+    ], function(error, row) {
+        if (error)
+            console.log(error);
+        else {
+            if (this.changes > 0)
+                console.log(`    Inserted new application \"${developmentApplication.applicationNumber}\" from \"${pdfFileName}\" into the database.`);
+            sqlStatement.finalize();  // releases any locks
+        }
+    });
 }
 
 // Reads a page using a request.
@@ -47,11 +54,10 @@ function insertRow(database, developmentApplication) {
 function requestPage(url, callback) {
     console.log(`Requesting page: ${url}`);
     request(url, (error, response, body) => {
-        if (error) {
+        if (error)
             console.log(`Error requesting page ${url}: ${error}`);
-            return;
-        }
-        callback(body);
+        else
+            callback(body);
     });
 }
 
@@ -71,7 +77,7 @@ function parsePdfs(database, url) {
             if (!pdfUrls.some(url => url === parsedPdfUrl.href))  // avoid duplicates
                 pdfUrls.push(parsedPdfUrl.href);
         });
-        console.log(`Found ${pdfUrls.length} PDF file(s) to read and parse at ${url}.`);
+        console.log(`Found ${pdfUrls.length} PDF file(s) to download and parse at ${url}.`);
 
         // Read and parse each PDF, extracting the development application text.
 
@@ -162,8 +168,10 @@ function parsePdfs(database, url) {
                 // rows in a table.  If the same development application number already exists on
                 // a row then that existing row will not be replaced.
 
+                let pdfFileName = decodeURIComponent(new urlparser.URL(pdfUrl).pathname.split("/").pop());
+                console.log(`Found ${developmentApplications.length} development application(s) in \"${pdfFileName}\".`)
                 for (let developmentApplication of developmentApplications)
-                    insertRow(database, developmentApplication);
+                    insertRow(database, pdfFileName, developmentApplication);
             });
         }
     });

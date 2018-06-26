@@ -12,6 +12,7 @@ let urlparser = require("url");
 let moment = require("moment");
 
 const LodgedApplicationsUrl = "http://www.campbelltown.sa.gov.au/page.aspx?u=1973";
+const CommentUrl = "mailto:mail@campbelltown.sa.gov.au";
 
 // Sets up an sqlite database.
 
@@ -94,7 +95,7 @@ function parsePdfs(database, url) {
                 let address = null;
                 let reason = null;
                 let informationUrl = pdfUrl;
-                let commentUrl = parsedUrl.origin;
+                let commentUrl = CommentUrl;
                 let scrapeDate = moment().format("YYYY-MM-DD");
                 let lodgementDate = null;
 

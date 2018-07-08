@@ -107,6 +107,22 @@ function parsePdfs(database, url) {
 
                 let previousPdfRow = null;
                 for (let pdfRow of pdfRows) {
+                    // Ignore the lines associated with a page break (that is, ignore the header
+                    // and footer text that appears at the top and bottom of every page).
+
+                    let line = pdfRow.join("").replace(/\s/g, "").toLowerCase();
+                    if (line.startsWith("publicregisterofdevelopmentapplications") ||
+                        line.startsWith("lodgementdatefrom") ||
+                        line.startsWith("lodgementdateto") ||
+                        line.startsWith("monday,") ||
+                        line.startsWith("tuesday,") ||
+                        line.startsWith("wednesday,") ||
+                        line.startsWith("thursday,") ||
+                        line.startsWith("friday,") ||
+                        line.startsWith("saturday,") ||
+                        line.startsWith("sunday,"))
+                        continue;
+
                     // If there are two forward slashes within the first 20 characters then it is
                     // very likely an application number (and it is not formatted as a date such
                     // as "31/12/2008").  For example, "162/0082/12".
@@ -136,7 +152,8 @@ function parsePdfs(database, url) {
                             lodgementDate = parseLodgementDate(pdfRow, 1, 0);
 
                         // Extract the address of the development application.  It is assumed to
-                        // always appear on the next line after the text "Property Address".
+                        // always appear on the next line after the text "Property Address"
+                        // (ignoring any header or footer text).
 
                         if (previousPdfRow !== null && previousPdfRow.join("").replace(/\s/g, "").toLowerCase().startsWith("propertyaddress")) {
                             address = pdfRow.join("").trim();
@@ -145,7 +162,8 @@ function parsePdfs(database, url) {
                         }
                     } else if (haveApplicationNumber && haveAddress) {
                         // Extract the reason for the development application.  It is assumed to
-                        // always appear on the next line after the text "Nature of Development".
+                        // always appear on the next line after the text "Nature of Development"
+                        // (ignoring any header or footer text).
 
                         if (previousPdfRow !== null && previousPdfRow.join("").replace(/\s/g, "").toLowerCase().startsWith("natureofdevelopment")) {
                             reason = pdfRow.join("").trim();

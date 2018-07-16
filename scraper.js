@@ -12,6 +12,7 @@ let urlparser = require("url");
 let moment = require("moment");
 
 const LodgedApplicationsUrl = "http://www.campbelltown.sa.gov.au/page.aspx?u=1973";
+const CommentUrl = "mailto:mail@campbelltown.sa.gov.au";
 
 // Sets up an sqlite database.
 
@@ -25,7 +26,7 @@ function initializeDatabase(callback) {
 
 // Inserts a row in the database if it does not already exist.
 
-function insertRow(database, developmentApplication) {
+function insertRow(database, pdfFileName, developmentApplication) {
     let sqlStatement = database.prepare("insert or ignore into [data] values (?, ?, ?, ?, ?, ?, ?, ?, ?)");
     sqlStatement.run([
         developmentApplication.applicationNumber,
@@ -37,8 +38,15 @@ function insertRow(database, developmentApplication) {
         developmentApplication.lodgementDate,
         null,
         null
-    ]);
-    sqlStatement.finalize();  // releases any locks
+    ], function(error, row) {
+        if (error)
+            console.log(error);
+        else {
+            if (this.changes > 0)
+                console.log(`    Inserted new application \"${developmentApplication.applicationNumber}\" from \"${pdfFileName}\" into the database.`);
+            sqlStatement.finalize();  // releases any locks
+        }
+    });
 }
 
 // Reads a page using a request.
@@ -46,11 +54,10 @@ function insertRow(database, developmentApplication) {
 function requestPage(url, callback) {
     console.log(`Requesting page: ${url}`);
     request(url, (error, response, body) => {
-        if (error) {
+        if (error)
             console.log(`Error requesting page ${url}: ${error}`);
-            return;
-        }
-        callback(body);
+        else
+            callback(body);
     });
 }
 
@@ -70,7 +77,7 @@ function parsePdfs(database, url) {
             if (!pdfUrls.some(url => url === parsedPdfUrl.href))  // avoid duplicates
                 pdfUrls.push(parsedPdfUrl.href);
         });
-        console.log(`Found ${pdfUrls.length} PDF file(s) to read and parse at ${url}.`);
+        console.log(`Found ${pdfUrls.length} PDF file(s) to download and parse at ${url}.`);
 
         // Read and parse each PDF, extracting the development application text.
 
@@ -94,12 +101,28 @@ function parsePdfs(database, url) {
                 let address = null;
                 let reason = null;
                 let informationUrl = pdfUrl;
-                let commentUrl = parsedUrl.origin;
+                let commentUrl = CommentUrl;
                 let scrapeDate = moment().format("YYYY-MM-DD");
                 let lodgementDate = null;
 
                 let previousPdfRow = null;
                 for (let pdfRow of pdfRows) {
+                    // Ignore the lines associated with a page break (that is, ignore the header
+                    // and footer text that appears at the top and bottom of every page).
+
+                    let line = pdfRow.join("").replace(/\s/g, "").toLowerCase();
+                    if (line.startsWith("publicregisterofdevelopmentapplications") ||
+                        line.startsWith("lodgementdatefrom") ||
+                        line.startsWith("lodgementdateto") ||
+                        line.startsWith("monday,") ||
+                        line.startsWith("tuesday,") ||
+                        line.startsWith("wednesday,") ||
+                        line.startsWith("thursday,") ||
+                        line.startsWith("friday,") ||
+                        line.startsWith("saturday,") ||
+                        line.startsWith("sunday,"))
+                        continue;
+
                     // If there are two forward slashes within the first 20 characters then it is
                     // very likely an application number (and it is not formatted as a date such
                     // as "31/12/2008").  For example, "162/0082/12".
@@ -129,7 +152,8 @@ function parsePdfs(database, url) {
                             lodgementDate = parseLodgementDate(pdfRow, 1, 0);
 
                         // Extract the address of the development application.  It is assumed to
-                        // always appear on the next line after the text "Property Address".
+                        // always appear on the next line after the text "Property Address"
+                        // (ignoring any header or footer text).
 
                         if (previousPdfRow !== null && previousPdfRow.join("").replace(/\s/g, "").toLowerCase().startsWith("propertyaddress")) {
                             address = pdfRow.join("").trim();
@@ -138,7 +162,8 @@ function parsePdfs(database, url) {
                         }
                     } else if (haveApplicationNumber && haveAddress) {
                         // Extract the reason for the development application.  It is assumed to
-                        // always appear on the next line after the text "Nature of Development".
+                        // always appear on the next line after the text "Nature of Development"
+                        // (ignoring any header or footer text).
 
                         if (previousPdfRow !== null && previousPdfRow.join("").replace(/\s/g, "").toLowerCase().startsWith("natureofdevelopment")) {
                             reason = pdfRow.join("").trim();
@@ -161,8 +186,10 @@ function parsePdfs(database, url) {
                 // rows in a table.  If the same development application number already exists on
                 // a row then that existing row will not be replaced.
 
+                let pdfFileName = decodeURIComponent(new urlparser.URL(pdfUrl).pathname.split("/").pop());
+                console.log(`Found ${developmentApplications.length} development application(s) in \"${pdfFileName}\".`)
                 for (let developmentApplication of developmentApplications)
-                    insertRow(database, developmentApplication);
+                    insertRow(database, pdfFileName, developmentApplication);
             });
         }
     });

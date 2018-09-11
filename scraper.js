@@ -209,6 +209,7 @@ function parsePdfs(database, url) {
                     for (let developmentApplication of developmentApplications)
                         insertRow(database, pdfFileName, developmentApplication);
                 });
+                console.log(`Starting parse of data from PDF at: ${pdfUrl}`);
                 pdfParser.parseBuffer(pdfBuffer);
             });
         }

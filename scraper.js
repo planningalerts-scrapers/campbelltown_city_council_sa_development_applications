@@ -91,8 +91,8 @@ function parsePdfs(database, url) {
 
         let selectedPdfUrls = [];
         selectedPdfUrls.push(pdfUrls.shift());
-        // if (pdfUrls.length > 0)
-        //     selectedPdfUrls.push(pdfUrls[getRandom(1, pdfUrls.length)]);
+        if (pdfUrls.length > 0)
+            selectedPdfUrls.push(pdfUrls[getRandom(1, pdfUrls.length)]);
 
         // Read and parse each PDF, extracting the development application text.
 
@@ -100,7 +100,7 @@ function parsePdfs(database, url) {
             // Parse the PDF into a collection of PDF rows.  Each PDF row is simply an array of
             // strings, being the text that has been parsed from the PDF.
 
-            request({ url: pdfUrl, encoding: null }, (error, response, body) => {
+            request({ url: pdfUrl, encoding: null }, (error, response, pdfBuffer) => {
                 console.log(`Obtained data from PDF at: ${pdfUrl}`);
                 let pdfParser = new pdf2json();
                 pdfParser
@@ -208,7 +208,7 @@ function parsePdfs(database, url) {
                     for (let developmentApplication of developmentApplications)
                         insertRow(database, pdfFileName, developmentApplication);
                 });
-                pdfParser.parseBuffer(body);
+                pdfParser.parseBuffer(pdfBuffer);
             });
         }
     });

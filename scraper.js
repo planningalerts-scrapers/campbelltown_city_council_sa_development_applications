@@ -100,7 +100,8 @@ function parsePdfs(database, url) {
             // Parse the PDF into a collection of PDF rows.  Each PDF row is simply an array of
             // strings, being the text that has been parsed from the PDF.
 
-            request({ url: pdfUrl, encoding: null }, (error, response, pdfBuffer) => {
+            console.log(`Requesting PDF at: ${pdfUrl}`);
+            request({ url: pdfUrl, encoding: null }, function(error, response, pdfBuffer) {
                 console.log(`Obtained data from PDF at: ${pdfUrl}`);
                 let pdfParser = new pdf2json();
                 pdfParser

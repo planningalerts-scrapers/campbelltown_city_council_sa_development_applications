@@ -102,10 +102,10 @@ function parsePdfs(database, url) {
 
             let pdfParser = new pdf2json();
             request({ url: pdfUrl, encoding: null }).pipe(pdfParser);
-            pdfParser.on("pdfParser_dataError", error => { console.error(error); });
+            pdfParser.on("pdfParser_dataError", function(error) { console.error(error); });
             pdfParser.on("error", function() { });
             pdfParser.on("finish", function() { });
-            pdfParser.on("pdfParser_dataReady", pdf => {
+            pdfParser.on("pdfParser_dataReady", function(pdf) {
                 // Convert the JSON representation of the PDF into a collection of PDF rows.
 
                 console.log(`Parsing PDF: ${pdfUrl}`);

@@ -2,12 +2,12 @@
   "version": "1.0.0",
   "main": "scraper.js",
   "dependencies": {
-    "cheerio": "^0.22.0",
-    "moment": "^2.22.2",
-    "pdf2json": "^1.1.7",
-    "request": "^2.87.0",
-    "sqlite3": "^4.0.1",
-    "url": "^0.11.0"
+    "cheerio": "0.22.0",
+    "moment": "2.22.2",
+    "pdf2json": "1.1.7",
+    "request": "2.87.0",
+    "sqlite3": "4.0.1",
+    "url": "0.11.0"
   },
   "keywords": [
     "scraper",

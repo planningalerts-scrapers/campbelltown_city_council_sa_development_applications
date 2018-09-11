@@ -206,7 +206,7 @@ function parsePdfs(database, url) {
                 console.log(`Found ${developmentApplications.length} development application(s) in \"${pdfFileName}\".`)
                 for (let developmentApplication of developmentApplications)
                     insertRow(database, pdfFileName, developmentApplication);
-            });
+            }).on("finish", () => { console.log("Finished."); });
         }
     });
 }

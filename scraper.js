@@ -101,11 +101,11 @@ function parsePdfs(database, url) {
             // strings, being the text that has been parsed from the PDF.
 
             let pdfParser = new pdf2json();
-            let pdfPipe = request({ url: pdfUrl, encoding: null }).pipe(pdfParser);
-            pdfPipe.on("pdfParser_dataError", error => console.error(error));
-            pdfPipe.on("error", function() { console.log("Error"); });
-            pdfPipe.on("finish", function() { console.log("Finish"); });
-            pdfPipe.on("pdfParser_dataReady", pdf => {
+            request({ url: pdfUrl, encoding: null }).pipe(pdfParser)
+            .on("pdfParser_dataError", error => console.error(error))
+            .on("error", function() { console.log("Error"); })
+            .on("finish", function() { console.log("Finish"); })
+            .on("pdfParser_dataReady", pdf => {
                 // Convert the JSON representation of the PDF into a collection of PDF rows.
 
                 console.log(`Parsing PDF: ${pdfUrl}`);

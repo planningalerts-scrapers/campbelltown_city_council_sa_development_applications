@@ -1,5 +1,8 @@
 {
   "version": "1.0.0",
+  "engines": {
+    "node": "10.6.0"
+  },
   "main": "scraper.js",
   "dependencies": {
     "cheerio": "^0.22.0",

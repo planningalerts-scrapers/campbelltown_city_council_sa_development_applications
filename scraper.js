@@ -35,7 +35,7 @@ function insertRow(database, pdfFileName, developmentApplication) {
     sqlStatement.run([
         developmentApplication.applicationNumber,
         developmentApplication.address,
-        developmentApplication.reason,
+        developmentApplication.description,
         developmentApplication.informationUrl,
         developmentApplication.commentUrl,
         developmentApplication.scrapeDate,
@@ -47,7 +47,9 @@ function insertRow(database, pdfFileName, developmentApplication) {
             console.log(error);
         else {
             if (this.changes > 0)
-                console.log(`    Inserted new application \"${developmentApplication.applicationNumber}\" from \"${pdfFileName}\" into the database.`);
+                console.log(`    Inserted: application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\" and description \"${developmentApplication.description}\" from \"${pdfFileName}\" into the database.`);
+            else
+                console.log(`    Skipped: application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\" and description \"${developmentApplication.description}\" from \"${pdfFileName}\" because it was already present in the database.`);
             sqlStatement.finalize();  // releases any locks
         }
     });
@@ -102,11 +104,13 @@ function parsePdfs(database, url) {
 
         // Read and parse each PDF, extracting the development application text.
 
+        let count = 0;
         for (let pdfUrl of selectedPdfUrls) {
             // Parse the PDF into a collection of PDF rows.  Each PDF row is simply an array of
             // strings, being the text that has been parsed from the PDF.
-
-            console.log(`Requesting data from PDF at: ${pdfUrl}`);
+            
+            count++;
+            console.log(`Requesting data from PDF ${count} of ${selectedPdfUrls.length} at: ${pdfUrl}`);
             request({ url: pdfUrl, encoding: null }, function(error, response, pdfBuffer) {
                 console.log(`Obtained data from PDF at: ${pdfUrl}`);
                 let pdfParser = new pdf2json();
@@ -123,7 +127,7 @@ function parsePdfs(database, url) {
                     let haveAddress = false;
                     let applicationNumber = null;
                     let address = null;
-                    let reason = null;
+                    let description = null;
                     let informationUrl = pdfUrl;
                     let commentUrl = CommentUrl;
                     let scrapeDate = moment().format("YYYY-MM-DD");
@@ -165,7 +169,7 @@ function parsePdfs(database, url) {
 
                             applicationNumber = parsedApplicationNumber;
                             address = null;
-                            reason = null;
+                            description = null;
                             lodgementDate = parseLodgementDate(pdfRow, 2, "nnn/nnnn/nn".length);  // dates appear after the application number
                             haveApplicationNumber = true;
                             haveAddress = false;
@@ -185,16 +189,16 @@ function parsePdfs(database, url) {
                                 haveAddress = true;
                             }
                         } else if (haveApplicationNumber && haveAddress) {
-                            // Extract the reason for the development application.  It is assumed to
-                            // always appear on the next line after the text "Nature of Development"
-                            // (ignoring any header or footer text).
+                            // Extract the description for the development application.  It is
+                            // assumed to always appear on the next line after the text "Nature of
+                            // Development" ignoring any header or footer text).
 
                             if (previousPdfRow !== null && previousPdfRow.join("").replace(/\s/g, "").toLowerCase().startsWith("natureofdevelopment")) {
-                                reason = pdfRow.join("").trim();
+                                description = pdfRow.join("").trim();
                                 developmentApplications.push({
                                     applicationNumber: applicationNumber,
                                     address: address,
-                                    reason: reason,
+                                    description: description,
                                     informationUrl: informationUrl,
                                     commentUrl: commentUrl,
                                     scrapeDate: scrapeDate,
@@ -211,10 +215,11 @@ function parsePdfs(database, url) {
                     // a row then that existing row will not be replaced.
 
                     let pdfFileName = decodeURIComponent(new urlparser.URL(pdfUrl).pathname.split("/").pop());
-                    console.log(`Found ${developmentApplications.length} development application(s) in \"${pdfFileName}\".`)
+                    console.log(`Found ${developmentApplications.length} development application(s) in \"${pdfFileName}\".  Updating the database as necessary.`);
                     for (let developmentApplication of developmentApplications)
                         insertRow(database, pdfFileName, developmentApplication);
                 });
+
                 console.log(`Starting parse of data from PDF at: ${pdfUrl}`);
                 pdfParser.parseBuffer(pdfBuffer);
             });

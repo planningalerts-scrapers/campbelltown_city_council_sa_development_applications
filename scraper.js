@@ -101,8 +101,8 @@ function parsePdfs(database, url) {
             // strings, being the text that has been parsed from the PDF.
 
             request({ url: pdfUrl, encoding: null }, (error, response, body) => {
+                console.log(`Obtained data from PDF at: ${pdfUrl}`);
                 let pdfParser = new pdf2json();
-                pdfParser.parseBuffer(body);
                 pdfParser
                 .on("pdfParser_dataError", function(error) { console.error(error); })
                 .on("pdfParser_dataReady", function(pdf) {
@@ -208,6 +208,7 @@ function parsePdfs(database, url) {
                     for (let developmentApplication of developmentApplications)
                         insertRow(database, pdfFileName, developmentApplication);
                 });
+                pdfParser.parseBuffer(body);
             });
         }
     });

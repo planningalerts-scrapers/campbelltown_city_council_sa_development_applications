@@ -60,8 +60,10 @@ function requestPage(url, callback) {
     request(url, (error, response, body) => {
         if (error)
             console.log(`Error requesting page ${url}: ${error}`);
-        else
+        else {
+            console.log(`Obtained page: ${url}`);
             callback(body);
+        }
     });
 }
 

@@ -77,7 +77,7 @@ function parsePdfs(database, url) {
             if (!pdfUrls.some(url => url === parsedPdfUrl.href))  // avoid duplicates
                 pdfUrls.push(parsedPdfUrl.href);
         });
-        console.log(`Found ${pdfUrls.length} PDF file(s) to download and parse at ${url}.`);
+        console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Found ${pdfUrls.length} PDF file(s) to download and parse at ${url}.`);
 
         // Read and parse each PDF, extracting the development application text.
 
@@ -91,8 +91,9 @@ function parsePdfs(database, url) {
             pdfPipe.on("pdfParser_dataReady", pdf => {
                 // Convert the JSON representation of the PDF into a collection of PDF rows.
 
-                console.log(`Parsing PDF: ${pdfUrl}`);
+                console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Parsing PDF: ${pdfUrl}`);
                 let pdfRows = convertPdfToText(pdf);
+                console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Parsed PDF: ${pdfUrl}`);
 
                 let developmentApplications = [];
                 let haveApplicationNumber = false;
@@ -104,6 +105,8 @@ function parsePdfs(database, url) {
                 let commentUrl = CommentUrl;
                 let scrapeDate = moment().format("YYYY-MM-DD");
                 let lodgementDate = null;
+
+                console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Processing PDF rows.`);
 
                 let previousPdfRow = null;
                 for (let pdfRow of pdfRows) {
@@ -187,12 +190,15 @@ function parsePdfs(database, url) {
                 // a row then that existing row will not be replaced.
 
                 let pdfFileName = decodeURIComponent(new urlparser.URL(pdfUrl).pathname.split("/").pop());
-                console.log(`Found ${developmentApplications.length} development application(s) in \"${pdfFileName}\".`)
+                console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Found ${developmentApplications.length} development application(s) in \"${pdfFileName}\".`)
                 for (let developmentApplication of developmentApplications)
                     insertRow(database, pdfFileName, developmentApplication);
+                console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Updated database.`)
             });
         }
+        console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Finished parsing PDFs.`);
     });
+    console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Complete.`);
 }
 
 // Parses an application number from the specified PDF row of text.
@@ -374,4 +380,6 @@ function run(database) {
     parsePdfs(database, LodgedApplicationsUrl);
 }
 
+console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Started.`);
 initializeDatabase(run);
+console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Exiting.`);

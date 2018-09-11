@@ -97,8 +97,8 @@ function parsePdfs(database, url) {
 
         let selectedPdfUrls = [];
         selectedPdfUrls.push(pdfUrls.shift());
-        // if (pdfUrls.length > 0)
-        //     selectedPdfUrls.push(pdfUrls[getRandom(1, pdfUrls.length)]);
+        if (pdfUrls.length > 0)
+            selectedPdfUrls.push(pdfUrls[getRandom(1, pdfUrls.length)]);
 
         // Read and parse each PDF, extracting the development application text.
 

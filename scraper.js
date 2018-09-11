@@ -14,6 +14,10 @@ let moment = require("moment");
 const LodgedApplicationsUrl = "http://www.campbelltown.sa.gov.au/page.aspx?u=1973";
 const CommentUrl = "mailto:mail@campbelltown.sa.gov.au";
 
+// Report any uncaught exceptions.
+
+process.on("uncaughtException", error => { console.log(error); });
+
 // Sets up an sqlite database.
 
 function initializeDatabase(callback) {

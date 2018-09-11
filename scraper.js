@@ -61,6 +61,12 @@ function requestPage(url, callback) {
     });
 }
 
+// Gets a random integer in the specified range: [minimum, maximum).
+
+function getRandom(minimum, maximum) {
+    return Math.floor(Math.random() * (Math.floor(maximum) - Math.ceil(minimum))) + Math.ceil(minimum);
+}
+
 // Parses all PDF files found at the specified URL.
 
 function parsePdfs(database, url) {
@@ -77,11 +83,20 @@ function parsePdfs(database, url) {
             if (!pdfUrls.some(url => url === parsedPdfUrl.href))  // avoid duplicates
                 pdfUrls.push(parsedPdfUrl.href);
         });
-        console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Found ${pdfUrls.length} PDF file(s) to download and parse at ${url}.`);
+        console.log(`Found ${pdfUrls.length} PDF file(s) to download and parse at ${url}.  Selecting two to parse.`);
+
+        // Select the most recent PDF.  And randomly select one other PDF (avoid processing all
+        // PDFs at once because this may use too much memory, resulting in morph.io terminating
+        // the current process).
+
+        let selectedPdfUrls = [];
+        selectedPdfUrls.push(pdfUrls.shift());
+        if (pdfUrls.length > 0)
+            selectedPdfUrls.push(pdfUrls[getRandom(1, pdfUrls.length)]);
 
         // Read and parse each PDF, extracting the development application text.
 
-        for (let pdfUrl of pdfUrls) {
+        for (let pdfUrl of selectedPdfUrls) {
             // Parse the PDF into a collection of PDF rows.  Each PDF row is simply an array of
             // strings, being the text that has been parsed from the PDF.
 
@@ -91,9 +106,8 @@ function parsePdfs(database, url) {
             pdfPipe.on("pdfParser_dataReady", pdf => {
                 // Convert the JSON representation of the PDF into a collection of PDF rows.
 
-                console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Parsing PDF: ${pdfUrl}`);
+                console.log(`Parsing PDF: ${pdfUrl}`);
                 let pdfRows = convertPdfToText(pdf);
-                console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Parsed PDF: ${pdfUrl}`);
 
                 let developmentApplications = [];
                 let haveApplicationNumber = false;
@@ -105,8 +119,6 @@ function parsePdfs(database, url) {
                 let commentUrl = CommentUrl;
                 let scrapeDate = moment().format("YYYY-MM-DD");
                 let lodgementDate = null;
-
-                console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Processing PDF rows.`);
 
                 let previousPdfRow = null;
                 for (let pdfRow of pdfRows) {
@@ -190,15 +202,12 @@ function parsePdfs(database, url) {
                 // a row then that existing row will not be replaced.
 
                 let pdfFileName = decodeURIComponent(new urlparser.URL(pdfUrl).pathname.split("/").pop());
-                console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Found ${developmentApplications.length} development application(s) in \"${pdfFileName}\".`)
+                console.log(`Found ${developmentApplications.length} development application(s) in \"${pdfFileName}\".`)
                 for (let developmentApplication of developmentApplications)
                     insertRow(database, pdfFileName, developmentApplication);
-                console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Updated database.`)
             });
         }
-        console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Finished parsing PDFs.`);
     });
-    console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Complete.`);
 }
 
 // Parses an application number from the specified PDF row of text.
@@ -380,6 +389,4 @@ function run(database) {
     parsePdfs(database, LodgedApplicationsUrl);
 }
 
-console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Started.`);
 initializeDatabase(run);
-console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Exiting.`);

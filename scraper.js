@@ -60,6 +60,7 @@ function insertRow(database, pdfFileName, developmentApplication) {
 function requestPage(url, callback) {
     console.log(`Requesting page: ${url}`);
     request(url, function(error, response, body) {
+        console.log(`Request for page complete: ${url}`);
         if (error)
             console.log(`Error requesting page ${url}: ${error}`);
         else {

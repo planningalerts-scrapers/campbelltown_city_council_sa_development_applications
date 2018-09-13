@@ -17,6 +17,7 @@ const CommentUrl = "mailto:mail@campbelltown.sa.gov.au";
 // Report any uncaught exceptions.
 
 process.on("uncaughtException", error => { console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Uncaught exception:`); console.log(error); });
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 // Sets up an sqlite database.
 

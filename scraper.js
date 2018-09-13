@@ -14,11 +14,6 @@ let moment = require("moment");
 const LodgedApplicationsUrl = "http://www.campbelltown.sa.gov.au/page.aspx?u=1973";
 const CommentUrl = "mailto:mail@campbelltown.sa.gov.au";
 
-// Report any uncaught exceptions.
-
-process.on("uncaughtException", error => { console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Uncaught exception:`); console.log(error); });
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-
 // Sets up an sqlite database.
 
 function initializeDatabase(callback) {
@@ -44,15 +39,13 @@ function insertRow(database, pdfFileName, developmentApplication) {
         null,
         null
     ], function(error, row) {
-        if (error) {
-            console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Error in insertRow:`);
+        if (error)
             console.log(error);
-        }
         else {
             if (this.changes > 0)
-                console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")}     Inserted: application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\" and description \"${developmentApplication.description}\" from \"${pdfFileName}\" into the database.`);
+                console.log(`    Inserted: application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\" and description \"${developmentApplication.description}\" from \"${pdfFileName}\" into the database.`);
             else
-                console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")}     Skipped: application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\" and description \"${developmentApplication.description}\" from \"${pdfFileName}\" because it was already present in the database.`);
+                console.log(`    Skipped: application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\" and description \"${developmentApplication.description}\" from \"${pdfFileName}\" because it was already present in the database.`);
             sqlStatement.finalize();  // releases any locks
         }
     });
@@ -61,22 +54,12 @@ function insertRow(database, pdfFileName, developmentApplication) {
 // Reads a page using a request.
     
 function requestPage(url, callback) {
-    console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Requesting page: ${url}`);
-    request({
-        url: url,
-        proxy: process.env.MORPH_PROXY,
-        headers: {
-            "Connection": "keep-alive",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36 Edge/17.17134"
-        }
-    }, function(error, response, body) {
-        console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Request for page complete: ${url}`);
+    console.log(`Requesting page: ${url}`);
+    request({ url: url, proxy: process.env.MORPH_PROXY }, (error, response, body) => {
         if (error)
-            console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Error requesting page ${url}: ${error}`);
-        else {
-            console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Obtained page: ${url}`);
+            console.log(`Error requesting page ${url}: ${error}`);
+        else
             callback(body);
-        }
     });
 }
 
@@ -102,7 +85,7 @@ function parsePdfs(database, url) {
             if (!pdfUrls.some(url => url === parsedPdfUrl.href))  // avoid duplicates
                 pdfUrls.push(parsedPdfUrl.href);
         });
-        console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Found ${pdfUrls.length} PDF file(s) to download and parse at ${url}.  Selecting two to parse.`);
+        console.log(`Found ${pdfUrls.length} PDF file(s) to download and parse at ${url}.  Selecting two to parse.`);
 
         // Select the most recent PDF.  And randomly select one other PDF (avoid processing all
         // PDFs at once because this may use too much memory, resulting in morph.io terminating
@@ -115,139 +98,115 @@ function parsePdfs(database, url) {
 
         // Read and parse each PDF, extracting the development application text.
 
-        let count = 0;
         for (let pdfUrl of selectedPdfUrls) {
             // Parse the PDF into a collection of PDF rows.  Each PDF row is simply an array of
             // strings, being the text that has been parsed from the PDF.
-            
-            count++;
-            console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Requesting data from PDF ${count} of ${selectedPdfUrls.length} at: ${pdfUrl}`);
-            request({
-                url: pdfUrl,
-                encoding: null,
-                proxy: process.env.MORPH_PROXY,
-                headers: {
-                    "Connection": "keep-alive",
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36 Edge/17.17134"
-                }
-            }, function(error, response, pdfBuffer) {
-                if (error) {
-                    console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Could not obtain PDF at: ${pdfUrl}`);
-                    console.log(error);
-                    return;
-                }
-                console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Obtained data from PDF (length ${pdfBuffer.length}) at: ${pdfUrl}`);
-                if (pdfBuffer.length < 4096)
-                    console.log(pdfBuffer.toString());
-                let pdfParser = new pdf2json();
-                pdfParser
-                .on("pdfParser_dataError", function(error) { console.error(error); })
-                .on("pdfParser_dataReady", function(pdf) {
-                    // Convert the JSON representation of the PDF into a collection of PDF rows.
 
-                    console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Parsing PDF: ${pdfUrl}`);
-                    let pdfRows = convertPdfToText(pdf);
+            let pdfParser = new pdf2json();
+            let pdfPipe = request({ url: pdfUrl, proxy: process.env.MORPH_PROXY, encoding: null }).pipe(pdfParser);
+            pdfPipe.on("pdfParser_dataError", error => { console.error(error); });
+            pdfPipe.on("pdfParser_dataReady", pdf => {
+                // Convert the JSON representation of the PDF into a collection of PDF rows.
 
-                    let developmentApplications = [];
-                    let haveApplicationNumber = false;
-                    let haveAddress = false;
-                    let applicationNumber = null;
-                    let address = null;
-                    let description = null;
-                    let informationUrl = pdfUrl;
-                    let commentUrl = CommentUrl;
-                    let scrapeDate = moment().format("YYYY-MM-DD");
-                    let lodgementDate = null;
+                console.log(`Parsing PDF: ${pdfUrl}`);
+                let pdfRows = convertPdfToText(pdf);
 
-                    let previousPdfRow = null;
-                    for (let pdfRow of pdfRows) {
-                        // Ignore the lines associated with a page break (that is, ignore the header
-                        // and footer text that appears at the top and bottom of every page).
+                let developmentApplications = [];
+                let haveApplicationNumber = false;
+                let haveAddress = false;
+                let applicationNumber = null;
+                let address = null;
+                let description = null;
+                let informationUrl = pdfUrl;
+                let commentUrl = CommentUrl;
+                let scrapeDate = moment().format("YYYY-MM-DD");
+                let lodgementDate = null;
 
-                        let line = pdfRow.join("").replace(/\s/g, "").toLowerCase();
-                        if (line.startsWith("publicregisterofdevelopmentapplications") ||
-                            line.startsWith("lodgementdatefrom") ||
-                            line.startsWith("lodgementdateto") ||
-                            line.startsWith("monday,") ||
-                            line.startsWith("tuesday,") ||
-                            line.startsWith("wednesday,") ||
-                            line.startsWith("thursday,") ||
-                            line.startsWith("friday,") ||
-                            line.startsWith("saturday,") ||
-                            line.startsWith("sunday,"))
-                            continue;
+                let previousPdfRow = null;
+                for (let pdfRow of pdfRows) {
+                    // Ignore the lines associated with a page break (that is, ignore the header
+                    // and footer text that appears at the top and bottom of every page).
 
-                        // If there are two forward slashes within the first 20 characters then it is
-                        // very likely an application number (and it is not formatted as a date such
-                        // as "31/12/2008").  For example, "162/0082/12".
-                        //
-                        // Note that sometimes the lodgement date will be difficult to correctly
-                        // obtain.  For example, if the date is split across two elements in a PDF
-                        // row:
-                        //
-                        //     ["26/10/2017", "02/", "11/2017", "Allot 1 DP ..."]
-                        //
-                        // The parseLodgementDate function makes an effort to resolve this situation.
-                        
-                        let parsedApplicationNumber = parseApplicationNumber(pdfRow);
-                        if (parsedApplicationNumber !== null) {
-                            // Extract the development application number and lodgement date.
+                    let line = pdfRow.join("").replace(/\s/g, "").toLowerCase();
+                    if (line.startsWith("publicregisterofdevelopmentapplications") ||
+                        line.startsWith("lodgementdatefrom") ||
+                        line.startsWith("lodgementdateto") ||
+                        line.startsWith("monday,") ||
+                        line.startsWith("tuesday,") ||
+                        line.startsWith("wednesday,") ||
+                        line.startsWith("thursday,") ||
+                        line.startsWith("friday,") ||
+                        line.startsWith("saturday,") ||
+                        line.startsWith("sunday,"))
+                        continue;
 
-                            applicationNumber = parsedApplicationNumber;
-                            address = null;
-                            description = null;
-                            lodgementDate = parseLodgementDate(pdfRow, 2, "nnn/nnnn/nn".length);  // dates appear after the application number
+                    // If there are two forward slashes within the first 20 characters then it is
+                    // very likely an application number (and it is not formatted as a date such
+                    // as "31/12/2008").  For example, "162/0082/12".
+                    //
+                    // Note that sometimes the lodgement date will be difficult to correctly
+                    // obtain.  For example, if the date is split across two elements in a PDF
+                    // row:
+                    //
+                    //     ["26/10/2017", "02/", "11/2017", "Allot 1 DP ..."]
+                    //
+                    // The parseLodgementDate function makes an effort to resolve this situation.
+                    
+                    let parsedApplicationNumber = parseApplicationNumber(pdfRow);
+                    if (parsedApplicationNumber !== null) {
+                        // Extract the development application number and lodgement date.
+
+                        applicationNumber = parsedApplicationNumber;
+                        address = null;
+                        description = null;
+                        lodgementDate = parseLodgementDate(pdfRow, 2, "nnn/nnnn/nn".length);  // dates appear after the application number
+                        haveApplicationNumber = true;
+                        haveAddress = false;
+                    } else if (haveApplicationNumber && !haveAddress) {
+                        // Attempt to extract the lodgement date (if it was not found earlier).
+
+                        if (lodgementDate === null)
+                            lodgementDate = parseLodgementDate(pdfRow, 1, 0);
+
+                        // Extract the address of the development application.  It is assumed to
+                        // always appear on the next line after the text "Property Address"
+                        // (ignoring any header or footer text).
+
+                        if (previousPdfRow !== null && previousPdfRow.join("").replace(/\s/g, "").toLowerCase().startsWith("propertyaddress")) {
+                            address = pdfRow.join("").trim();
                             haveApplicationNumber = true;
-                            haveAddress = false;
-                        } else if (haveApplicationNumber && !haveAddress) {
-                            // Attempt to extract the lodgement date (if it was not found earlier).
-
-                            if (lodgementDate === null)
-                                lodgementDate = parseLodgementDate(pdfRow, 1, 0);
-
-                            // Extract the address of the development application.  It is assumed to
-                            // always appear on the next line after the text "Property Address"
-                            // (ignoring any header or footer text).
-
-                            if (previousPdfRow !== null && previousPdfRow.join("").replace(/\s/g, "").toLowerCase().startsWith("propertyaddress")) {
-                                address = pdfRow.join("").trim();
-                                haveApplicationNumber = true;
-                                haveAddress = true;
-                            }
-                        } else if (haveApplicationNumber && haveAddress) {
-                            // Extract the description for the development application.  It is
-                            // assumed to always appear on the next line after the text "Nature of
-                            // Development" ignoring any header or footer text).
-
-                            if (previousPdfRow !== null && previousPdfRow.join("").replace(/\s/g, "").toLowerCase().startsWith("natureofdevelopment")) {
-                                description = pdfRow.join("").trim();
-                                developmentApplications.push({
-                                    applicationNumber: applicationNumber,
-                                    address: address,
-                                    description: description,
-                                    informationUrl: informationUrl,
-                                    commentUrl: commentUrl,
-                                    scrapeDate: scrapeDate,
-                                    lodgementDate: ((lodgementDate === null) ? null : lodgementDate.format("YYYY-MM-DD")) });
-                                haveApplicationNumber = false;
-                                haveAddress = false;
-                            }
+                            haveAddress = true;
                         }
-                        previousPdfRow = pdfRow;
+                    } else if (haveApplicationNumber && haveAddress) {
+                        // Extract the description for the development application.  It is assumed
+                        // to always appear on the next line after the text "Nature of Development"
+                        // (ignoring any header or footer text).
+
+                        if (previousPdfRow !== null && previousPdfRow.join("").replace(/\s/g, "").toLowerCase().startsWith("natureofdevelopment")) {
+                            description = pdfRow.join("").trim();
+                            developmentApplications.push({
+                                applicationNumber: applicationNumber,
+                                address: address,
+                                description: description,
+                                informationUrl: informationUrl,
+                                commentUrl: commentUrl,
+                                scrapeDate: scrapeDate,
+                                lodgementDate: ((lodgementDate === null) ? null : lodgementDate.format("YYYY-MM-DD")) });
+                            haveApplicationNumber = false;
+                            haveAddress = false;
+                        }
                     }
+                    previousPdfRow = pdfRow;
+                }
 
-                    // Insert all the development applications that were found into the database as
-                    // rows in a table.  If the same development application number already exists on
-                    // a row then that existing row will not be replaced.
+                // Insert all the development applications that were found into the database as
+                // rows in a table.  If the same development application number already exists on
+                // a row then that existing row will not be replaced.
 
-                    let pdfFileName = decodeURIComponent(new urlparser.URL(pdfUrl).pathname.split("/").pop());
-                    console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Found ${developmentApplications.length} development application(s) in \"${pdfFileName}\".  Updating the database as necessary.`);
-                    for (let developmentApplication of developmentApplications)
-                        insertRow(database, pdfFileName, developmentApplication);
-                });
-
-                console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Starting parse of data from PDF at: ${pdfUrl}`);
-                pdfParser.parseBuffer(pdfBuffer);
+                let pdfFileName = decodeURIComponent(new urlparser.URL(pdfUrl).pathname.split("/").pop());
+                console.log(`Found ${developmentApplications.length} development application(s) in \"${pdfFileName}\".`);
+                for (let developmentApplication of developmentApplications)
+                    insertRow(database, pdfFileName, developmentApplication);
             });
         }
     });

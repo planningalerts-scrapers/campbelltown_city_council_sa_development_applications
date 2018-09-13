@@ -64,6 +64,7 @@ function requestPage(url, callback) {
     console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Requesting page: ${url}`);
     request({
         url: url,
+        proxy: process.env.MORPH_PROXY,
         headers: {
             "Connection": "keep-alive",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36 Edge/17.17134"
@@ -124,6 +125,7 @@ function parsePdfs(database, url) {
             request({
                 url: pdfUrl,
                 encoding: null,
+                proxy: process.env.MORPH_PROXY,
                 headers: {
                     "Connection": "keep-alive",
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36 Edge/17.17134"

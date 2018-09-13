@@ -129,7 +129,9 @@ function parsePdfs(database, url) {
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36 Edge/17.17134"
                 }
             }, function(error, response, pdfBuffer) {
-                console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Obtained data from PDF at: ${pdfUrl}`);
+                console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Obtained data from PDF (length ${pdfBuffer.length}) at: ${pdfUrl}`);
+                if (pdfBuffer.length < 4096)
+                    console.log(pdfBuffer.toString());
                 let pdfParser = new pdf2json();
                 pdfParser
                 .on("pdfParser_dataError", function(error) { console.error(error); })

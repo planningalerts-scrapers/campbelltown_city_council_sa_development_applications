@@ -62,7 +62,7 @@ function insertRow(database, pdfFileName, developmentApplication) {
     
 function requestPage(url, callback) {
     console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Requesting page: ${url}`);
-    request({ url: url, headers: { "Connection": "close" } }, function(error, response, body) {
+    request({ url: url, headers: { "Connection": "keep-alive" } }, function(error, response, body) {
         console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Request for page complete: ${url}`);
         if (error)
             console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Error requesting page ${url}: ${error}`);
@@ -115,7 +115,7 @@ function parsePdfs(database, url) {
             
             count++;
             console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Requesting data from PDF ${count} of ${selectedPdfUrls.length} at: ${pdfUrl}`);
-            request({ url: pdfUrl, encoding: null, headers: { "Connection": "close" } }, function(error, response, pdfBuffer) {
+            request({ url: pdfUrl, encoding: null, headers: { "Connection": "keep-alive" } }, function(error, response, pdfBuffer) {
                 console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Obtained data from PDF at: ${pdfUrl}`);
                 let pdfParser = new pdf2json();
                 pdfParser

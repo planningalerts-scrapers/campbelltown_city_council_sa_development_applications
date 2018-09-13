@@ -16,7 +16,7 @@ const CommentUrl = "mailto:mail@campbelltown.sa.gov.au";
 
 // Report any uncaught exceptions.
 
-process.on("uncaughtException", error => { console.log(error); });
+process.on("uncaughtException", error => { console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Uncaught exception:`); console.log(error); });
 
 // Sets up an sqlite database.
 
@@ -43,13 +43,15 @@ function insertRow(database, pdfFileName, developmentApplication) {
         null,
         null
     ], function(error, row) {
-        if (error)
+        if (error) {
+            console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Error in insertRow:`);
             console.log(error);
+        }
         else {
             if (this.changes > 0)
-                console.log(`    Inserted: application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\" and description \"${developmentApplication.description}\" from \"${pdfFileName}\" into the database.`);
+                console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")}     Inserted: application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\" and description \"${developmentApplication.description}\" from \"${pdfFileName}\" into the database.`);
             else
-                console.log(`    Skipped: application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\" and description \"${developmentApplication.description}\" from \"${pdfFileName}\" because it was already present in the database.`);
+                console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")}     Skipped: application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\" and description \"${developmentApplication.description}\" from \"${pdfFileName}\" because it was already present in the database.`);
             sqlStatement.finalize();  // releases any locks
         }
     });
@@ -58,13 +60,13 @@ function insertRow(database, pdfFileName, developmentApplication) {
 // Reads a page using a request.
     
 function requestPage(url, callback) {
-    console.log(`Requesting page: ${url}`);
+    console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Requesting page: ${url}`);
     request(url, function(error, response, body) {
-        console.log(`Request for page complete: ${url}`);
+        console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Request for page complete: ${url}`);
         if (error)
-            console.log(`Error requesting page ${url}: ${error}`);
+            console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Error requesting page ${url}: ${error}`);
         else {
-            console.log(`Obtained page: ${url}`);
+            console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Obtained page: ${url}`);
             callback(body);
         }
     });
@@ -92,7 +94,7 @@ function parsePdfs(database, url) {
             if (!pdfUrls.some(url => url === parsedPdfUrl.href))  // avoid duplicates
                 pdfUrls.push(parsedPdfUrl.href);
         });
-        console.log(`Found ${pdfUrls.length} PDF file(s) to download and parse at ${url}.  Selecting two to parse.`);
+        console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Found ${pdfUrls.length} PDF file(s) to download and parse at ${url}.  Selecting two to parse.`);
 
         // Select the most recent PDF.  And randomly select one other PDF (avoid processing all
         // PDFs at once because this may use too much memory, resulting in morph.io terminating
@@ -111,16 +113,16 @@ function parsePdfs(database, url) {
             // strings, being the text that has been parsed from the PDF.
             
             count++;
-            console.log(`Requesting data from PDF ${count} of ${selectedPdfUrls.length} at: ${pdfUrl}`);
+            console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Requesting data from PDF ${count} of ${selectedPdfUrls.length} at: ${pdfUrl}`);
             request({ url: pdfUrl, encoding: null }, function(error, response, pdfBuffer) {
-                console.log(`Obtained data from PDF at: ${pdfUrl}`);
+                console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Obtained data from PDF at: ${pdfUrl}`);
                 let pdfParser = new pdf2json();
                 pdfParser
                 .on("pdfParser_dataError", function(error) { console.error(error); })
                 .on("pdfParser_dataReady", function(pdf) {
                     // Convert the JSON representation of the PDF into a collection of PDF rows.
 
-                    console.log(`Parsing PDF: ${pdfUrl}`);
+                    console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Parsing PDF: ${pdfUrl}`);
                     let pdfRows = convertPdfToText(pdf);
 
                     let developmentApplications = [];
@@ -216,12 +218,12 @@ function parsePdfs(database, url) {
                     // a row then that existing row will not be replaced.
 
                     let pdfFileName = decodeURIComponent(new urlparser.URL(pdfUrl).pathname.split("/").pop());
-                    console.log(`Found ${developmentApplications.length} development application(s) in \"${pdfFileName}\".  Updating the database as necessary.`);
+                    console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Found ${developmentApplications.length} development application(s) in \"${pdfFileName}\".  Updating the database as necessary.`);
                     for (let developmentApplication of developmentApplications)
                         insertRow(database, pdfFileName, developmentApplication);
                 });
 
-                console.log(`Starting parse of data from PDF at: ${pdfUrl}`);
+                console.log(`${moment().format("YYYY-MM-DD HH:mm:ss")} Starting parse of data from PDF at: ${pdfUrl}`);
                 pdfParser.parseBuffer(pdfBuffer);
             });
         }

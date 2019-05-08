@@ -27,7 +27,7 @@ function initializeDatabase(callback) {
 // Inserts a row in the database if it does not already exist.
 
 function insertRow(database, pdfFileName, developmentApplication) {
-    let sqlStatement = database.prepare("insert or ignore into [data] values (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    let sqlStatement = database.prepare("insert or replace into [data] values (?, ?, ?, ?, ?, ?, ?, ?, ?)");
     sqlStatement.run([
         developmentApplication.applicationNumber,
         developmentApplication.address,
@@ -42,10 +42,7 @@ function insertRow(database, pdfFileName, developmentApplication) {
         if (error)
             console.log(error);
         else {
-            if (this.changes > 0)
-                console.log(`    Inserted: application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\" and description \"${developmentApplication.description}\" from \"${pdfFileName}\" into the database.`);
-            else
-                console.log(`    Skipped: application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\" and description \"${developmentApplication.description}\" from \"${pdfFileName}\" because it was already present in the database.`);
+            console.log(`    Saved: application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\" and description \"${developmentApplication.description}\" from \"${pdfFileName}\" into the database.`);
             sqlStatement.finalize();  // releases any locks
         }
     });

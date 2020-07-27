@@ -11,7 +11,7 @@ let pdf2json = require("pdf2json");
 let urlparser = require("url");
 let moment = require("moment");
 
-const LodgedApplicationsUrl = "http://www.campbelltown.sa.gov.au/page.aspx?u=1973";
+const LodgedApplicationsUrl = "https://www.campbelltown.sa.gov.au/development/public-registers/public-register-of-applications-lodged";
 const CommentUrl = "mailto:mail@campbelltown.sa.gov.au";
 
 // Sets up an sqlite database.
@@ -27,7 +27,7 @@ function initializeDatabase(callback) {
 // Inserts a row in the database if it does not already exist.
 
 function insertRow(database, pdfFileName, developmentApplication) {
-    let sqlStatement = database.prepare("insert or ignore into [data] values (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    let sqlStatement = database.prepare("insert or replace into [data] values (?, ?, ?, ?, ?, ?, ?, ?, ?)");
     sqlStatement.run([
         developmentApplication.applicationNumber,
         developmentApplication.address,
@@ -42,10 +42,7 @@ function insertRow(database, pdfFileName, developmentApplication) {
         if (error)
             console.log(error);
         else {
-            if (this.changes > 0)
-                console.log(`    Inserted: application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\" and description \"${developmentApplication.description}\" from \"${pdfFileName}\" into the database.`);
-            else
-                console.log(`    Skipped: application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\" and description \"${developmentApplication.description}\" from \"${pdfFileName}\" because it was already present in the database.`);
+            console.log(`    Saved application \"${developmentApplication.applicationNumber}\" with address \"${developmentApplication.address}\" and description \"${developmentApplication.description}\" from \"${pdfFileName}\" to the database.`);
             sqlStatement.finalize();  // releases any locks
         }
     });
@@ -80,7 +77,7 @@ function parsePdfs(database, url) {
  
         let pdfUrls = [];
         let $ = cheerio.load(body);
-        $("div.uContentList a").each((index, element) => {
+        $("h3.generic-list__title a").each((index, element) => {
             let parsedPdfUrl = new urlparser.URL(element.attribs.href, baseUrl);
             if (!pdfUrls.some(url => url === parsedPdfUrl.href))  // avoid duplicates
                 pdfUrls.push(parsedPdfUrl.href);
